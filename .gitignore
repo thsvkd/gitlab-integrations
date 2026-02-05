@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# 환경변수
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 테스트
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 빌드
+*.egg-info/
+dist/
+build/
+
+# uv
+.uv/
