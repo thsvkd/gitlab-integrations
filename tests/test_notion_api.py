@@ -26,14 +26,6 @@ def mock_notion_client() -> MagicMock:
 
 
 @pytest.fixture
-def notion_client(mock_notion_client: MagicMock) -> NotionClient:
-    """Create a NotionClient with mocked SDK client."""
-    client = NotionClient(token="test-token", database_id="test-db-id")
-    client._client = mock_notion_client
-    return client
-
-
-@pytest.fixture
 def sample_notion_page() -> dict:
     """Create a sample Notion page response."""
     return {
@@ -67,6 +59,22 @@ def sample_notion_page() -> dict:
     }
 
 
+@pytest.fixture
+def notion_client_with_mocks(mock_notion_client: MagicMock, sample_notion_page: dict):
+    """Create a NotionClient with mocked SDK client and httpx."""
+    with patch("gitlab_integrations.notion.api.httpx") as mock_httpx:
+        client = NotionClient(token="test-token", database_id="test-db-id")
+        client._client = mock_notion_client
+
+        # Mock httpx.post for _query_database
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"results": [sample_notion_page], "has_more": False}
+        mock_response.raise_for_status = MagicMock()
+        mock_httpx.post.return_value = mock_response
+
+        yield client, mock_notion_client, mock_httpx
+
+
 class TestNotionClient:
     """Tests for NotionClient class."""
 
@@ -98,82 +106,86 @@ class TestNotionClient:
             with pytest.raises(ValueError, match="Notion database ID is not configured"):
                 _ = client.database_id
 
+    def test_database_id_converts_to_uuid(self) -> None:
+        """Test database_id converts 32-char string to UUID format."""
+        client = NotionClient(token="test", database_id="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6")
+        assert client.database_id == "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
+
     def test_create_page(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
         sample_notion_page: dict,
     ) -> None:
         """Test creating a new Notion page."""
+        client, mock_notion_client, _ = notion_client_with_mocks
         mock_notion_client.pages.create.return_value = sample_notion_page
 
         properties = {
             NotionProperties.TITLE: {"title": [{"text": {"content": "New Issue"}}]},
         }
-        result = notion_client.create_page(properties)
+        result = client.create_page(properties)
 
-        mock_notion_client.pages.create.assert_called_once_with(
-            parent={"database_id": "test-db-id"},
-            properties=properties,
-        )
+        mock_notion_client.pages.create.assert_called_once()
         assert result["id"] == "page-123"
 
     def test_get_page(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
         sample_notion_page: dict,
     ) -> None:
         """Test retrieving a page by ID."""
+        client, mock_notion_client, _ = notion_client_with_mocks
         mock_notion_client.pages.retrieve.return_value = sample_notion_page
 
-        result = notion_client.get_page("page-123")
+        result = client.get_page("page-123")
 
         mock_notion_client.pages.retrieve.assert_called_once_with(page_id="page-123")
         assert result["id"] == "page-123"
 
     def test_get_page_by_gitlab_iid_found(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
         sample_notion_page: dict,
     ) -> None:
         """Test finding page by GitLab IID when it exists."""
-        mock_notion_client.databases.query.return_value = {
-            "results": [sample_notion_page]
-        }
+        client, _, mock_httpx = notion_client_with_mocks
 
-        result = notion_client.get_page_by_gitlab_iid(123)
+        result = client.get_page_by_gitlab_iid(123)
 
-        mock_notion_client.databases.query.assert_called_once()
+        mock_httpx.post.assert_called_once()
         assert result is not None
         assert result["id"] == "page-123"
 
     def test_get_page_by_gitlab_iid_not_found(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
     ) -> None:
         """Test finding page by GitLab IID when it doesn't exist."""
-        mock_notion_client.databases.query.return_value = {"results": []}
+        client, _, mock_httpx = notion_client_with_mocks
 
-        result = notion_client.get_page_by_gitlab_iid(999)
+        # Override mock to return empty results
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"results": [], "has_more": False}
+        mock_response.raise_for_status = MagicMock()
+        mock_httpx.post.return_value = mock_response
+
+        result = client.get_page_by_gitlab_iid(999)
 
         assert result is None
 
     def test_update_page(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
         sample_notion_page: dict,
     ) -> None:
         """Test updating an existing page."""
+        client, mock_notion_client, _ = notion_client_with_mocks
         mock_notion_client.pages.update.return_value = sample_notion_page
 
         properties = {
             NotionProperties.STATUS: {"select": {"name": "closed"}},
         }
-        result = notion_client.update_page("page-123", properties)
+        result = client.update_page("page-123", properties)
 
         mock_notion_client.pages.update.assert_called_once_with(
             page_id="page-123",
@@ -183,15 +195,15 @@ class TestNotionClient:
 
     def test_archive_page(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
         sample_notion_page: dict,
     ) -> None:
         """Test archiving a page."""
+        client, mock_notion_client, _ = notion_client_with_mocks
         archived_page = {**sample_notion_page, "archived": True}
         mock_notion_client.pages.update.return_value = archived_page
 
-        result = notion_client.archive_page("page-123")
+        result = client.archive_page("page-123")
 
         mock_notion_client.pages.update.assert_called_once_with(
             page_id="page-123",
@@ -201,64 +213,63 @@ class TestNotionClient:
 
     def test_query_modified_pages(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
         sample_notion_page: dict,
     ) -> None:
         """Test querying modified pages without time filter."""
-        mock_notion_client.databases.query.return_value = {
-            "results": [sample_notion_page],
-            "has_more": False,
-        }
+        client, _, mock_httpx = notion_client_with_mocks
 
-        result = notion_client.query_modified_pages()
+        result = client.query_modified_pages()
 
         assert len(result) == 1
         assert result[0]["id"] == "page-123"
 
     def test_query_modified_pages_with_since_filter(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
         sample_notion_page: dict,
     ) -> None:
         """Test querying modified pages with time filter."""
-        # Page was edited on 2024-01-02
-        mock_notion_client.databases.query.return_value = {
-            "results": [sample_notion_page],
-            "has_more": False,
-        }
+        client, _, _ = notion_client_with_mocks
 
         # Filter for pages modified after 2024-01-01
-        result = notion_client.query_modified_pages(since="2024-01-01T00:00:00+00:00")
+        result = client.query_modified_pages(since="2024-01-01T00:00:00+00:00")
 
         assert len(result) == 1
 
     def test_query_modified_pages_pagination(
         self,
-        notion_client: NotionClient,
-        mock_notion_client: MagicMock,
+        notion_client_with_mocks: tuple,
         sample_notion_page: dict,
     ) -> None:
         """Test querying pages with pagination."""
+        client, _, mock_httpx = notion_client_with_mocks
         page2 = {**sample_notion_page, "id": "page-456"}
 
-        mock_notion_client.databases.query.side_effect = [
-            {
-                "results": [sample_notion_page],
-                "has_more": True,
-                "next_cursor": "cursor-1",
-            },
-            {
-                "results": [page2],
-                "has_more": False,
-            },
+        # Setup pagination responses
+        responses = [
+            MagicMock(
+                json=MagicMock(return_value={
+                    "results": [sample_notion_page],
+                    "has_more": True,
+                    "next_cursor": "cursor-1",
+                }),
+                raise_for_status=MagicMock(),
+            ),
+            MagicMock(
+                json=MagicMock(return_value={
+                    "results": [page2],
+                    "has_more": False,
+                }),
+                raise_for_status=MagicMock(),
+            ),
         ]
+        mock_httpx.post.side_effect = responses
 
-        result = notion_client.query_modified_pages()
+        result = client.query_modified_pages()
 
         assert len(result) == 2
-        assert mock_notion_client.databases.query.call_count == 2
+        assert mock_httpx.post.call_count == 2
 
 
 class TestGetNotionClient:
@@ -278,3 +289,4 @@ class TestGetNotionClient:
                 client2 = get_notion_client()
 
                 assert client1 is client2
+

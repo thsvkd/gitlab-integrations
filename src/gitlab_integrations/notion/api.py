@@ -8,12 +8,16 @@ including page creation, retrieval, update, and querying.
 import logging
 from typing import Any
 
+import httpx
 from notion_client import Client
 
 from gitlab_integrations.config import settings
 from gitlab_integrations.notion.schemas import NotionProperties
 
 logger = logging.getLogger(__name__)
+
+NOTION_API_BASE = "https://api.notion.com/v1"
+NOTION_VERSION = "2022-06-28"
 
 
 class NotionClient:
@@ -56,7 +60,7 @@ class NotionClient:
     @property
     def database_id(self) -> str:
         """
-        Get configured database ID.
+        Get configured database ID in UUID format.
 
         Returns:
             str: Notion database ID.
@@ -66,7 +70,47 @@ class NotionClient:
         """
         if not self._database_id:
             raise ValueError("Notion database ID is not configured")
-        return self._database_id
+        # Convert to UUID format if needed
+        db_id = self._database_id
+        if len(db_id) == 32 and "-" not in db_id:
+            db_id = f"{db_id[:8]}-{db_id[8:12]}-{db_id[12:16]}-{db_id[16:20]}-{db_id[20:]}"
+        return db_id
+
+    def _get_headers(self) -> dict[str, str]:
+        """Get HTTP headers for Notion API requests."""
+        return {
+            "Authorization": f"Bearer {self._token}",
+            "Notion-Version": NOTION_VERSION,
+            "Content-Type": "application/json",
+        }
+
+    def _query_database(
+        self,
+        filter_conditions: dict[str, Any] | None = None,
+        page_size: int = 100,
+        start_cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Query database using direct HTTP request.
+
+        Args:
+            filter_conditions: Optional filter for the query.
+            page_size: Number of results per page.
+            start_cursor: Cursor for pagination.
+
+        Returns:
+            dict[str, Any]: Query response.
+        """
+        body: dict[str, Any] = {"page_size": page_size}
+        if filter_conditions:
+            body["filter"] = filter_conditions
+        if start_cursor:
+            body["start_cursor"] = start_cursor
+
+        url = f"{NOTION_API_BASE}/databases/{self.database_id}/query"
+        response = httpx.post(url, headers=self._get_headers(), json=body)
+        response.raise_for_status()
+        return response.json()
 
     def create_page(self, properties: dict[str, Any]) -> dict[str, Any]:
         """
@@ -116,9 +160,8 @@ class NotionClient:
             dict[str, Any] | None: Page object if found, None otherwise.
         """
         logger.debug(f"Searching for page with GitLab IID: {gitlab_iid}")
-        response = self.client.databases.query(
-            database_id=self.database_id,
-            filter={
+        response = self._query_database(
+            filter_conditions={
                 "property": NotionProperties.GITLAB_IID,
                 "number": {"equals": gitlab_iid},
             },
@@ -197,9 +240,8 @@ class NotionClient:
         start_cursor: str | None = None
 
         while has_more:
-            response = self.client.databases.query(
-                database_id=self.database_id,
-                filter=filter_conditions,
+            response = self._query_database(
+                filter_conditions=filter_conditions,
                 page_size=page_size,
                 start_cursor=start_cursor,
             )
@@ -252,3 +294,4 @@ def get_notion_client() -> NotionClient:
     if _notion_client is None:
         _notion_client = NotionClient()
     return _notion_client
+
