@@ -152,3 +152,20 @@ def list_issues(
     """
     project = get_project()
     return list(project.issues.list(state=state, per_page=per_page))
+
+
+def list_labels() -> list[dict[str, str]]:
+    """
+    List all labels from the project.
+
+    Returns:
+        list[dict[str, str]]: List of label dictionaries with 'name' and 'color' keys.
+
+    Example:
+        >>> labels = list_labels()
+        >>> for label in labels:
+        ...     print(f"{label['name']} ({label['color']})")
+    """
+    project = get_project()
+    labels = project.labels.list(all=True)
+    return [{"name": label.name, "color": label.color} for label in labels]
