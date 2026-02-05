@@ -1,4 +1,4 @@
-"""FastAPI 메인 애플리케이션."""
+"""FastAPI main application."""
 
 import argparse
 from contextlib import asynccontextmanager
@@ -13,76 +13,76 @@ from gitlab_slack.gitlab.webhooks import router as gitlab_router
 from gitlab_slack.slack.commands import register_commands
 from gitlab_slack.slack.modals import register_modals
 
-# Slack Bolt 앱 초기화
+# Initialize Slack Bolt app
 slack_app = App(
     token=settings.slack_bot_token,
     signing_secret=settings.slack_signing_secret,
 )
 
-# 커맨드 및 모달 등록
+# Register commands and modals
 register_commands(slack_app)
 register_modals(slack_app)
 
-# Slack 요청 핸들러
+# Slack request handler
 slack_handler = SlackRequestHandler(slack_app)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """애플리케이션 라이프사이클 관리."""
-    print("🚀 GitLab-Slack Integration 서비스 시작")
+    """Manage application lifecycle."""
+    print("🚀 GitLab-Slack Integration service started")
 
-    # 보안 설정 확인
+    # Security configuration check
     if not settings.gitlab_webhook_secret:
-        print("⚠️  경고: GITLAB_WEBHOOK_SECRET이 설정되지 않았습니다!")
-        print("   프로덕션 환경에서는 반드시 Webhook Secret을 설정하세요.")
+        print("⚠️  Warning: GITLAB_WEBHOOK_SECRET is not configured!")
+        print("   Please set the Webhook Secret for production environments.")
 
     yield
-    print("👋 서비스 종료")
+    print("👋 Service stopped")
 
 
-# FastAPI 앱 초기화
+# Initialize FastAPI app
 app = FastAPI(
     title="GitLab-Slack Integration",
-    description="GitLab과 Slack 간의 이슈 연동 서비스",
+    description="Issue integration service between GitLab and Slack",
     version="0.1.0",
     lifespan=lifespan,
 )
 
-# GitLab webhook 라우터 등록
+# Register GitLab webhook router
 app.include_router(gitlab_router, prefix="/gitlab", tags=["gitlab"])
 
 
 @app.post("/slack/events")
 async def slack_events(request: Request):
-    """Slack 이벤트 엔드포인트."""
+    """Slack events endpoint."""
     return await slack_handler.handle(request)
 
 
 @app.post("/slack/commands")
 async def slack_commands(request: Request):
-    """Slack 커맨드 엔드포인트."""
+    """Slack commands endpoint."""
     return await slack_handler.handle(request)
 
 
 @app.post("/slack/interactions")
 async def slack_interactions(request: Request):
-    """Slack 인터랙션 엔드포인트 (Modal 등)."""
+    """Slack interactions endpoint (Modal, etc.)."""
     return await slack_handler.handle(request)
 
 
 @app.get("/health")
 async def health_check():
-    """헬스체크 엔드포인트."""
+    """Health check endpoint."""
     return {"status": "healthy", "service": "gitlab-slack-integration"}
 
 
 def main():
-    """서버 실행."""
-    parser = argparse.ArgumentParser(description="GitLab-Slack Integration 서버")
-    parser.add_argument("-p", "--port", type=int, default=settings.port, help=f"서버 포트 (기본값: {settings.port})")
-    parser.add_argument("-H", "--host", type=str, default=settings.host, help=f"서버 호스트 (기본값: {settings.host})")
-    parser.add_argument("--no-reload", action="store_true", help="자동 리로드 비활성화")
+    """Run server."""
+    parser = argparse.ArgumentParser(description="GitLab-Slack Integration Server")
+    parser.add_argument("-p", "--port", type=int, default=settings.port, help=f"Server port (default: {settings.port})")
+    parser.add_argument("-H", "--host", type=str, default=settings.host, help=f"Server host (default: {settings.host})")
+    parser.add_argument("--no-reload", action="store_true", help="Disable auto-reload")
     args = parser.parse_args()
 
     uvicorn.run(

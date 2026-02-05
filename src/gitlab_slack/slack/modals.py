@@ -1,17 +1,17 @@
-"""Slack Modal 정의 및 처리."""
+"""Slack Modal definitions and handlers."""
 
 from slack_bolt import App
 
 from gitlab_slack.config import settings
 from gitlab_slack.gitlab.api import create_issue
 
-# 이슈 생성 모달 정의
+# Issue creation modal definition
 ISSUE_CREATE_MODAL = {
     "type": "modal",
     "callback_id": "issue_create_modal",
-    "title": {"type": "plain_text", "text": "새 이슈 등록"},
-    "submit": {"type": "plain_text", "text": "생성하기"},
-    "close": {"type": "plain_text", "text": "취소"},
+    "title": {"type": "plain_text", "text": "New Issue"},
+    "submit": {"type": "plain_text", "text": "Create"},
+    "close": {"type": "plain_text", "text": "Cancel"},
     "blocks": [
         {
             "type": "input",
@@ -19,9 +19,9 @@ ISSUE_CREATE_MODAL = {
             "element": {
                 "type": "plain_text_input",
                 "action_id": "title_input",
-                "placeholder": {"type": "plain_text", "text": "이슈 제목을 입력하세요"},
+                "placeholder": {"type": "plain_text", "text": "Enter issue title"},
             },
-            "label": {"type": "plain_text", "text": "제목"},
+            "label": {"type": "plain_text", "text": "Title"},
         },
         {
             "type": "input",
@@ -29,27 +29,27 @@ ISSUE_CREATE_MODAL = {
             "element": {
                 "type": "static_select",
                 "action_id": "type_select",
-                "placeholder": {"type": "plain_text", "text": "유형 선택"},
+                "placeholder": {"type": "plain_text", "text": "Select type"},
                 "options": [
                     {
-                        "text": {"type": "plain_text", "text": "🐛 버그"},
+                        "text": {"type": "plain_text", "text": "🐛 Bug"},
                         "value": "bug",
                     },
                     {
-                        "text": {"type": "plain_text", "text": "✨ 기능 요청"},
+                        "text": {"type": "plain_text", "text": "✨ Feature Request"},
                         "value": "feature",
                     },
                     {
-                        "text": {"type": "plain_text", "text": "📝 문서"},
+                        "text": {"type": "plain_text", "text": "📝 Documentation"},
                         "value": "documentation",
                     },
                     {
-                        "text": {"type": "plain_text", "text": "❓ 질문"},
+                        "text": {"type": "plain_text", "text": "❓ Question"},
                         "value": "question",
                     },
                 ],
             },
-            "label": {"type": "plain_text", "text": "유형"},
+            "label": {"type": "plain_text", "text": "Type"},
         },
         {
             "type": "input",
@@ -57,31 +57,31 @@ ISSUE_CREATE_MODAL = {
             "element": {
                 "type": "static_select",
                 "action_id": "priority_select",
-                "placeholder": {"type": "plain_text", "text": "우선순위 선택"},
+                "placeholder": {"type": "plain_text", "text": "Select priority"},
                 "options": [
                     {
-                        "text": {"type": "plain_text", "text": "🔴 긴급"},
+                        "text": {"type": "plain_text", "text": "🔴 Critical"},
                         "value": "critical",
                     },
                     {
-                        "text": {"type": "plain_text", "text": "🟠 높음"},
+                        "text": {"type": "plain_text", "text": "🟠 High"},
                         "value": "high",
                     },
                     {
-                        "text": {"type": "plain_text", "text": "🟡 보통"},
+                        "text": {"type": "plain_text", "text": "🟡 Medium"},
                         "value": "medium",
                     },
                     {
-                        "text": {"type": "plain_text", "text": "🟢 낮음"},
+                        "text": {"type": "plain_text", "text": "🟢 Low"},
                         "value": "low",
                     },
                 ],
                 "initial_option": {
-                    "text": {"type": "plain_text", "text": "🟡 보통"},
+                    "text": {"type": "plain_text", "text": "🟡 Medium"},
                     "value": "medium",
                 },
             },
-            "label": {"type": "plain_text", "text": "우선순위"},
+            "label": {"type": "plain_text", "text": "Priority"},
         },
         {
             "type": "input",
@@ -92,10 +92,10 @@ ISSUE_CREATE_MODAL = {
                 "multiline": True,
                 "placeholder": {
                     "type": "plain_text",
-                    "text": "이슈에 대한 상세 설명을 입력하세요",
+                    "text": "Enter detailed description",
                 },
             },
-            "label": {"type": "plain_text", "text": "설명"},
+            "label": {"type": "plain_text", "text": "Description"},
             "optional": True,
         },
     ],
@@ -103,14 +103,14 @@ ISSUE_CREATE_MODAL = {
 
 
 def register_modals(app: App):
-    """Modal 제출 핸들러 등록."""
+    """Register modal submission handlers."""
 
     @app.view("issue_create_modal")
     def handle_issue_create_submission(ack, body, client, view, logger):
-        """이슈 생성 모달 제출 처리."""
+        """Handle issue creation modal submission."""
         ack()
 
-        # 입력값 추출
+        # Extract input values
         values = view["state"]["values"]
         title = values["title_block"]["title_input"]["value"]
         issue_type = values["type_block"]["type_select"]["selected_option"]["value"]
@@ -120,30 +120,30 @@ def register_modals(app: App):
         user_id = body["user"]["id"]
         user_name = body["user"].get("name", "Unknown")
 
-        # 라벨 매핑
+        # Label mapping
         labels = [f"type::{issue_type}", f"priority::{priority}"]
 
-        # 설명에 Slack 사용자 정보 추가
-        full_description = f"{description}\n\n---\n_Slack에서 생성됨 by @{user_name}_"
+        # Add Slack user info to description
+        full_description = f"{description}\n\n---\n_Created from Slack by @{user_name}_"
 
         try:
-            # GitLab 이슈 생성
+            # Create GitLab issue
             issue = create_issue(
                 title=title,
                 description=full_description,
                 labels=labels,
             )
 
-            # 성공 메시지 전송
+            # Send success message
             client.chat_postMessage(
                 channel=settings.slack_channel_id,
-                text=f"✅ 새 이슈가 생성되었습니다!",
+                text="✅ New issue has been created!",
                 blocks=[
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"✅ *새 이슈가 생성되었습니다!*",
+                            "text": "✅ *New issue has been created!*",
                         },
                     },
                     {
@@ -151,19 +151,19 @@ def register_modals(app: App):
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f"*제목:*\n{issue.title}",
+                                "text": f"*Title:*\n{issue.title}",
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*이슈 번호:*\n#{issue.iid}",
+                                "text": f"*Issue Number:*\n#{issue.iid}",
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*유형:*\n{issue_type}",
+                                "text": f"*Type:*\n{issue_type}",
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*우선순위:*\n{priority}",
+                                "text": f"*Priority:*\n{priority}",
                             },
                         ],
                     },
@@ -174,7 +174,7 @@ def register_modals(app: App):
                                 "type": "button",
                                 "text": {
                                     "type": "plain_text",
-                                    "text": "GitLab에서 보기",
+                                    "text": "View in GitLab",
                                 },
                                 "url": issue.web_url,
                                 "action_id": "view_gitlab_issue",
@@ -184,11 +184,11 @@ def register_modals(app: App):
                 ],
             )
 
-            logger.info(f"이슈 생성 성공: #{issue.iid} - {title}")
+            logger.info(f"Issue created successfully: #{issue.iid} - {title}")
 
         except Exception as e:
-            logger.error(f"이슈 생성 실패: {e}")
+            logger.error(f"Failed to create issue: {e}")
             client.chat_postMessage(
                 channel=settings.slack_channel_id,
-                text="❌ 이슈 생성에 실패했습니다. 관리자에게 문의하세요.",
+                text="❌ Failed to create issue. Please contact the administrator.",
             )

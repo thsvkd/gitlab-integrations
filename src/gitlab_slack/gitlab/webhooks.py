@@ -1,4 +1,4 @@
-"""GitLab Webhook 처리."""
+"""GitLab Webhook handlers."""
 
 import logging
 
@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Slack 클라이언트
+# Slack client
 slack_client = WebClient(token=settings.slack_bot_token)
 
-# Webhook Secret 미설정 경고
+# Warning if Webhook Secret is not configured
 if not settings.gitlab_webhook_secret:
     logger.warning(
-        "⚠️  GITLAB_WEBHOOK_SECRET이 설정되지 않았습니다. "
-        "프로덕션 환경에서는 반드시 설정하세요!"
+        "⚠️  GITLAB_WEBHOOK_SECRET is not configured. "
+        "Please set it for production environments!"
     )
 
 
@@ -29,15 +29,15 @@ async def handle_gitlab_webhook(
     x_gitlab_token: str = Header(None, alias="X-Gitlab-Token"),
 ):
     """
-    GitLab Webhook 이벤트 처리.
+    Handle GitLab Webhook events.
 
-    지원 이벤트:
-    - Issue Hook: 이슈 생성/수정/상태변경
+    Supported events:
+    - Issue Hook: Issue create/update/state change
     """
     if not x_gitlab_event:
         raise HTTPException(status_code=400, detail="Missing X-Gitlab-Event header")
 
-    # Webhook Secret 검증
+    # Webhook Secret verification
     if settings.gitlab_webhook_secret:
         if x_gitlab_token != settings.gitlab_webhook_secret:
             raise HTTPException(status_code=401, detail="Invalid webhook token")
@@ -47,14 +47,14 @@ async def handle_gitlab_webhook(
     if x_gitlab_event == "Issue Hook":
         await handle_issue_event(payload)
     else:
-        # 지원하지 않는 이벤트는 무시
+        # Ignore unsupported events
         pass
 
     return {"status": "ok"}
 
 
 async def handle_issue_event(payload: dict):
-    """이슈 이벤트 처리."""
+    """Handle issue events."""
     object_attributes = payload.get("object_attributes", {})
     action = object_attributes.get("action")
 
@@ -67,31 +67,31 @@ async def handle_issue_event(payload: dict):
     user = payload.get("user", {})
     user_name = user.get("name", "Unknown")
 
-    # 액션에 따른 메시지 생성
+    # Generate message based on action
     if action == "open":
         emoji = "🆕"
-        action_text = "새 이슈가 생성되었습니다"
+        action_text = "New issue created"
     elif action == "close":
         emoji = "✅"
-        action_text = "이슈가 종료되었습니다"
+        action_text = "Issue closed"
     elif action == "reopen":
         emoji = "🔄"
-        action_text = "이슈가 다시 열렸습니다"
+        action_text = "Issue reopened"
     elif action == "update":
         emoji = "📝"
-        action_text = "이슈가 수정되었습니다"
+        action_text = "Issue updated"
     else:
-        # 기타 액션은 무시
+        # Ignore other actions
         return
 
-    # 설명 미리보기 (최대 200자)
+    # Description preview (max 200 characters)
     description_preview = ""
     if issue_description:
         description_preview = issue_description[:200]
         if len(issue_description) > 200:
             description_preview += "..."
 
-    # Slack 메시지 전송
+    # Send Slack message
     blocks = [
         {
             "type": "section",
@@ -105,37 +105,37 @@ async def handle_issue_event(payload: dict):
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*이슈:*\n<{issue_url}|#{issue_iid} {issue_title}>",
+                    "text": f"*Issue:*\n<{issue_url}|#{issue_iid} {issue_title}>",
                 },
                 {
                     "type": "mrkdwn",
-                    "text": f"*상태:*\n`{issue_state}`",
+                    "text": f"*Status:*\n`{issue_state}`",
                 },
                 {
                     "type": "mrkdwn",
-                    "text": f"*담당자:*\n{user_name}",
+                    "text": f"*Author:*\n{user_name}",
                 },
             ],
         },
     ]
 
-    # 설명이 있으면 추가
+    # Add description if available
     if description_preview:
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*설명:*\n{description_preview}",
+                "text": f"*Description:*\n{description_preview}",
             },
         })
 
-    # 버튼 추가
+    # Add button
     blocks.append({
         "type": "actions",
         "elements": [
             {
                 "type": "button",
-                "text": {"type": "plain_text", "text": "GitLab에서 보기"},
+                "text": {"type": "plain_text", "text": "View in GitLab"},
                 "url": issue_url,
                 "action_id": "view_issue_from_webhook",
             },

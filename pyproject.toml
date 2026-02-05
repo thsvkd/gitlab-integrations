@@ -1,7 +1,7 @@
 [project]
 name = "gitlab-slack-integration"
 version = "0.1.0"
-description = "GitLab과 Slack 간의 이슈 연동 서비스"
+description = "Issue integration service between GitLab and Slack"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

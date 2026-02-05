@@ -1,4 +1,4 @@
-"""Slack Slash 커맨드 처리."""
+"""Slack Slash command handlers."""
 
 from slack_bolt import App
 
@@ -7,16 +7,16 @@ from gitlab_slack.slack.modals import ISSUE_CREATE_MODAL
 
 
 def register_commands(app: App):
-    """Slack 커맨드 등록."""
+    """Register Slack commands."""
 
     @app.command("/issue")
     def handle_issue_command(ack, command, client, logger):
         """
-        /issue 커맨드 처리.
+        Handle /issue command.
 
-        사용법:
-        - /issue : 이슈 생성 모달 열기
-        - /issue status <번호> : 이슈 상태 조회
+        Usage:
+        - /issue : Open issue creation modal
+        - /issue status <number> : Check issue status
         """
         ack()
 
@@ -25,7 +25,7 @@ def register_commands(app: App):
         channel_id = command["channel_id"]
         user_id = command["user_id"]
 
-        # /issue status <번호> 처리
+        # Handle /issue status <number>
         if text.startswith("status"):
             parts = text.split()
             if len(parts) >= 2:
@@ -37,39 +37,39 @@ def register_commands(app: App):
                         client.chat_postEphemeral(
                             channel=channel_id,
                             user=user_id,
-                            text=f"{state_emoji} *이슈 #{issue.iid}*: {issue.title}\n"
-                                 f"• 상태: `{issue.state}`\n"
-                                 f"• 라벨: {', '.join(issue.labels) or '없음'}\n"
-                                 f"• 링크: {issue.web_url}",
+                            text=f"{state_emoji} *Issue #{issue.iid}*: {issue.title}\n"
+                                 f"• Status: `{issue.state}`\n"
+                                 f"• Labels: {', '.join(issue.labels) or 'None'}\n"
+                                 f"• Link: {issue.web_url}",
                         )
                     else:
                         client.chat_postEphemeral(
                             channel=channel_id,
                             user=user_id,
-                            text=f"❌ 이슈 #{issue_iid}를 찾을 수 없습니다.",
+                            text=f"❌ Issue #{issue_iid} not found.",
                         )
                 except Exception as e:
-                    logger.error(f"이슈 조회 실패: {e}")
+                    logger.error(f"Failed to fetch issue: {e}")
                     client.chat_postEphemeral(
                         channel=channel_id,
                         user=user_id,
-                        text="❌ 이슈 조회 중 오류가 발생했습니다. 관리자에게 문의하세요.",
+                        text="❌ An error occurred while fetching the issue. Please contact the administrator.",
                     )
             else:
                 client.chat_postEphemeral(
                     channel=channel_id,
                     user=user_id,
-                    text="사용법: `/issue status <이슈번호>`",
+                    text="Usage: `/issue status <issue_number>`",
                 )
             return
 
-        # /issue (이슈 생성 모달 열기)
+        # /issue (Open issue creation modal)
         try:
             client.views_open(trigger_id=trigger_id, view=ISSUE_CREATE_MODAL)
         except Exception as e:
-            logger.error(f"모달 열기 실패: {e}")
+            logger.error(f"Failed to open modal: {e}")
             client.chat_postEphemeral(
                 channel=channel_id,
                 user=user_id,
-                text="❌ 이슈 생성 모달을 열 수 없습니다. 관리자에게 문의하세요.",
+                text="❌ Failed to open issue creation modal. Please contact the administrator.",
             )

@@ -1,1 +1,1 @@
-"""GitLab 연동 모듈."""
+"""GitLab integration module."""

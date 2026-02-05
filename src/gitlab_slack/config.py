@@ -1,23 +1,23 @@
-"""환경 설정 모듈."""
+"""Configuration module."""
 
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """애플리케이션 설정."""
+    """Application settings."""
 
-    # GitLab 설정
+    # GitLab settings
     gitlab_url: str
     gitlab_token: str
     gitlab_project_id: int
     gitlab_webhook_secret: str | None = None
 
-    # Slack 설정
+    # Slack settings
     slack_bot_token: str
     slack_signing_secret: str
     slack_channel_id: str
 
-    # 서버 설정
+    # Server settings
     host: str = "0.0.0.0"
     port: int = 8000
 
