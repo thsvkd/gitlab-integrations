@@ -5,7 +5,7 @@ This module defines handlers for Slack slash commands,
 primarily the /issue command for interacting with GitLab issues.
 
 Commands:
-    /issue: Opens issue creation modal.
+    /issue: Opens issue creation modal with dynamic labels from GitLab.
     /issue status <number>: Shows status of a specific issue.
 """
 
@@ -15,8 +15,8 @@ from typing import Any
 from slack_bolt import Ack, App
 from slack_sdk import WebClient
 
-from gitlab_integrations.gitlab.api import get_issue_by_iid
-from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
+from gitlab_integrations.gitlab.api import get_issue_by_iid, list_labels
+from gitlab_integrations.slack.modals import build_issue_create_modal
 
 
 def register_commands(app: App) -> None:
@@ -177,7 +177,7 @@ def _open_issue_modal(
     logger: logging.Logger,
 ) -> None:
     """
-    Open the issue creation modal.
+    Open the issue creation modal with dynamic labels from GitLab.
 
     Args:
         trigger_id: Slack trigger ID for opening the modal.
@@ -188,9 +188,16 @@ def _open_issue_modal(
 
     Note:
         On failure, sends ephemeral error message to the user.
+        Labels are fetched from GitLab at runtime for dynamic dropdown.
     """
     try:
-        client.views_open(trigger_id=trigger_id, view=ISSUE_CREATE_MODAL)
+        # Fetch labels from GitLab
+        labels = list_labels()
+
+        # Build modal with dynamic labels
+        modal = build_issue_create_modal(labels)
+
+        client.views_open(trigger_id=trigger_id, view=modal)
     except Exception as e:
         logger.error(f"Failed to open modal: {e}")
         client.chat_postEphemeral(

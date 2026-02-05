@@ -5,8 +5,7 @@ This module defines the Slack Block Kit modal for issue creation
 and handles modal submission events.
 
 Modals:
-    ISSUE_CREATE_MODAL: Modal for creating new GitLab issues with
-        title, type, priority, and description fields.
+    build_issue_create_modal: Function to build modal with dynamic labels from GitLab.
 """
 
 import logging
@@ -23,14 +22,26 @@ SlackModal = dict[str, Any]
 SlackBlocks = list[dict[str, Any]]
 
 
-# Issue creation modal definition
-ISSUE_CREATE_MODAL: SlackModal = {
-    "type": "modal",
-    "callback_id": "issue_create_modal",
-    "title": {"type": "plain_text", "text": "New Issue"},
-    "submit": {"type": "plain_text", "text": "Create"},
-    "close": {"type": "plain_text", "text": "Cancel"},
-    "blocks": [
+def build_issue_create_modal(labels: list[dict[str, str]]) -> SlackModal:
+    """
+    Build issue creation modal with dynamic label options from GitLab.
+
+    Args:
+        labels: List of label dictionaries from GitLab with 'name' and 'color' keys.
+
+    Returns:
+        SlackModal: Slack Block Kit modal definition.
+    """
+    # Build label options for the dropdown
+    label_options = [
+        {
+            "text": {"type": "plain_text", "text": label["name"]},
+            "value": label["name"],
+        }
+        for label in labels
+    ]
+
+    blocks: SlackBlocks = [
         {
             "type": "input",
             "block_id": "title_block",
@@ -40,66 +51,6 @@ ISSUE_CREATE_MODAL: SlackModal = {
                 "placeholder": {"type": "plain_text", "text": "Enter issue title"},
             },
             "label": {"type": "plain_text", "text": "Title"},
-        },
-        {
-            "type": "input",
-            "block_id": "type_block",
-            "element": {
-                "type": "static_select",
-                "action_id": "type_select",
-                "placeholder": {"type": "plain_text", "text": "Select type"},
-                "options": [
-                    {
-                        "text": {"type": "plain_text", "text": "Bug"},
-                        "value": "bug",
-                    },
-                    {
-                        "text": {"type": "plain_text", "text": "Feature Request"},
-                        "value": "feature",
-                    },
-                    {
-                        "text": {"type": "plain_text", "text": "Documentation"},
-                        "value": "documentation",
-                    },
-                    {
-                        "text": {"type": "plain_text", "text": "Question"},
-                        "value": "question",
-                    },
-                ],
-            },
-            "label": {"type": "plain_text", "text": "Type"},
-        },
-        {
-            "type": "input",
-            "block_id": "priority_block",
-            "element": {
-                "type": "static_select",
-                "action_id": "priority_select",
-                "placeholder": {"type": "plain_text", "text": "Select priority"},
-                "options": [
-                    {
-                        "text": {"type": "plain_text", "text": "Critical"},
-                        "value": "critical",
-                    },
-                    {
-                        "text": {"type": "plain_text", "text": "High"},
-                        "value": "high",
-                    },
-                    {
-                        "text": {"type": "plain_text", "text": "Medium"},
-                        "value": "medium",
-                    },
-                    {
-                        "text": {"type": "plain_text", "text": "Low"},
-                        "value": "low",
-                    },
-                ],
-                "initial_option": {
-                    "text": {"type": "plain_text", "text": "Medium"},
-                    "value": "medium",
-                },
-            },
-            "label": {"type": "plain_text", "text": "Priority"},
         },
         {
             "type": "input",
@@ -116,8 +67,31 @@ ISSUE_CREATE_MODAL: SlackModal = {
             "label": {"type": "plain_text", "text": "Description"},
             "optional": True,
         },
-    ],
-}
+    ]
+
+    # Add label selection only if labels exist
+    if label_options:
+        blocks.append({
+            "type": "input",
+            "block_id": "labels_block",
+            "element": {
+                "type": "multi_static_select",
+                "action_id": "labels_select",
+                "placeholder": {"type": "plain_text", "text": "Select labels"},
+                "options": label_options,
+            },
+            "label": {"type": "plain_text", "text": "Labels"},
+            "optional": True,
+        })
+
+    return {
+        "type": "modal",
+        "callback_id": "issue_create_modal",
+        "title": {"type": "plain_text", "text": "New Issue"},
+        "submit": {"type": "plain_text", "text": "Create"},
+        "close": {"type": "plain_text", "text": "Cancel"},
+        "blocks": blocks,
+    }
 
 
 def register_modals(app: App) -> None:
@@ -160,12 +134,8 @@ def register_modals(app: App) -> None:
 
         Form Fields:
             - title_block/title_input: Issue title (required)
-            - type_block/type_select: Issue type (bug/feature/etc.)
-            - priority_block/priority_select: Priority level
+            - labels_block/labels_select: Labels (optional, multi-select)
             - description_block/description_input: Description (optional)
-
-        GitLab Labels:
-            Creates labels in format: type::<type>, priority::<priority>
 
         Note:
             On success, posts a rich message to the configured Slack channel.
@@ -176,15 +146,20 @@ def register_modals(app: App) -> None:
         # Extract input values from modal
         values: dict[str, Any] = view["state"]["values"]
         title: str = values["title_block"]["title_input"]["value"]
-        issue_type: str = values["type_block"]["type_select"]["selected_option"]["value"]
-        priority: str = values["priority_block"]["priority_select"]["selected_option"]["value"]
         description: str = values["description_block"]["description_input"].get("value", "") or ""
+
+        # Extract selected labels (multi-select returns list of selected options)
+        selected_labels: list[str] = []
+        if "labels_block" in values and values["labels_block"]["labels_select"].get(
+            "selected_options"
+        ):
+            selected_labels = [
+                option["value"]
+                for option in values["labels_block"]["labels_select"]["selected_options"]
+            ]
 
         user_id: str = body["user"]["id"]
         user_name: str = body["user"].get("name", "Unknown")
-
-        # Build GitLab labels from type and priority
-        labels: list[str] = [f"type::{issue_type}", f"priority::{priority}"]
 
         # Append Slack user info to description
         full_description: str = f"{description}\n\n---\n_Created from Slack by @{user_name}_"
@@ -194,15 +169,14 @@ def register_modals(app: App) -> None:
             issue = create_issue(
                 title=title,
                 description=full_description,
-                labels=labels,
+                labels=selected_labels,
             )
 
             # Build success message blocks
             blocks: SlackBlocks = _build_issue_created_blocks(
                 issue_title=issue.title,
                 issue_iid=issue.iid,
-                issue_type=issue_type,
-                priority=priority,
+                labels=selected_labels,
                 issue_url=issue.web_url,
             )
 
@@ -226,8 +200,7 @@ def register_modals(app: App) -> None:
 def _build_issue_created_blocks(
     issue_title: str,
     issue_iid: int,
-    issue_type: str,
-    priority: str,
+    labels: list[str],
     issue_url: str,
 ) -> SlackBlocks:
     """
@@ -236,13 +209,14 @@ def _build_issue_created_blocks(
     Args:
         issue_title: Title of the created issue.
         issue_iid: Issue number within the project.
-        issue_type: Type label (bug/feature/etc.).
-        priority: Priority label (critical/high/medium/low).
+        labels: List of label names applied to the issue.
         issue_url: Full URL to the issue in GitLab.
 
     Returns:
         SlackBlocks: List of Slack Block Kit blocks for the message.
     """
+    labels_text = ", ".join(labels) if labels else "None"
+
     return [
         {
             "type": "section",
@@ -264,11 +238,7 @@ def _build_issue_created_blocks(
                 },
                 {
                     "type": "mrkdwn",
-                    "text": f"*Type:*\n{issue_type}",
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": f"*Priority:*\n{priority}",
+                    "text": f"*Labels:*\n{labels_text}",
                 },
             ],
         },
