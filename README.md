@@ -2,7 +2,9 @@
 
 [한국어](README.ko.md)
 
-Integration service between GitLab and external services (Slack, Notion, etc.)
+Integration service for **self-hosted (on-premise) GitLab** with external services (Slack, Notion, etc.)
+
+> **Note**: This project is designed for **self-hosted GitLab servers** (GitLab CE/EE installed on your own infrastructure), not for GitLab.com (SaaS). It bridges your internal GitLab instance with external collaboration tools.
 
 ## Features
 
@@ -17,15 +19,30 @@ Integration service between GitLab and external services (Slack, Notion, etc.)
 ## Architecture
 
 ```
-┌─────────────┐     ┌─────────────────────┐     ┌──────────────┐
-│   GitLab    │────►│  Integration Server │◄────│    Slack     │
-│   (inner)   │◄────│      (FastAPI)      │────►│  (external)  │
-└─────────────┘     └─────────────────────┘     └──────────────┘
-      │                       │                       │
-      │ Webhook               │                       │ Slash Command
-      │ (issue update notify) │                       │ (/issue)
-      └───────────────────────┴───────────────────────┘
+        Internal Network                          External Services
+    ┌───────────────────────┐                   ┌───────────────────┐
+    │                       │                   │                   │
+    │  ┌─────────────────┐  │    Webhook/API    │  ┌─────────────┐  │
+    │  │ GitLab Server   │◄─┼───────────────────┼──│   Slack     │  │
+    │  │ (self-hosted)   │  │                   │  │             │  │
+    │  └────────┬────────┘  │                   │  └──────┬──────┘  │
+    │           │           │                   │         │         │
+    │           │ Webhook   │                   │  Slash  │         │
+    │           ▼           │                   │ Command │         │
+    │  ┌─────────────────┐  │   Tunnel/Proxy    │         │         │
+    │  │  Integration    │◄─┼───────────────────┼─────────┘         │
+    │  │  Server         │──┼───────────────────┼──────────────────►│
+    │  │  (FastAPI)      │  │  (Cloudflare,     │                   │
+    │  └─────────────────┘  │   Tailscale, etc) │                   │
+    │                       │                   │                   │
+    └───────────────────────┘                   └───────────────────┘
 ```
+
+**Key Points:**
+- GitLab server runs on internal network (not accessible from internet)
+- Integration server bridges internal GitLab with external services
+- External access via tunnel (Cloudflare Tunnel, Tailscale, etc.) or reverse proxy
+- Supports self-signed SSL certificates commonly used in internal servers
 
 ---
 

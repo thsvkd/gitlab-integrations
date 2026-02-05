@@ -2,7 +2,10 @@
 GitLab Integrations Service.
 
 This package provides a FastAPI-based service for integrating
-GitLab with external services (Slack, Notion, etc.).
+self-hosted (on-premise) GitLab servers with external services (Slack, Notion, etc.).
+
+Designed for internal GitLab instances that are not directly accessible from the internet,
+this service acts as a bridge between your GitLab server and external collaboration tools.
 
 Current Features (Slack):
 - Creating GitLab issues from Slack using /issue command
