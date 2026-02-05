@@ -4,10 +4,11 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
 
 VENV_DIR=".venv"
-PYTHON_VERSION="3.11"
+PYTHON_VERSION="3.10"
 
 echo "🚀 GitLab-Slack Integration 환경 설정 시작"
 echo "================================================"
@@ -52,16 +53,16 @@ create_venv() {
 # 가상환경 활성화 및 패키지 설치
 install_packages() {
     echo "📥 패키지 설치 중..."
-    
+
     # 가상환경 활성화
     source "$VENV_DIR/bin/activate"
-    
+
     # pip 업그레이드
     pip install --upgrade pip
-    
+
     # 패키지 설치
     pip install -e ".[dev]"
-    
+
     echo "✅ 패키지 설치 완료"
 }
 
@@ -110,9 +111,8 @@ main() {
     echo "✅ 환경 설정 완료!"
     echo ""
     echo "📌 사용 방법:"
-    echo "   가상환경 활성화: source $VENV_DIR/bin/activate"
-    echo "   서버 실행:       ./run.sh"
-    echo "   다른 포트 실행:  ./run.sh --port 9000"
+    echo "   서버 실행:       ./scripts/run.sh"
+    echo "   다른 포트 실행:  ./scripts/run.sh --port 9000"
     echo "================================================"
 }
 
