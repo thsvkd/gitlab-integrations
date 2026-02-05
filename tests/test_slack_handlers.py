@@ -11,40 +11,6 @@ class TestIssueCommand:
     def test_issue_command_opens_modal(self):
         """Test that /issue command opens the issue creation modal."""
         from gitlab_integrations.slack.commands import register_commands
-        from slack_bolt import App
-
-        app = App(
-            token="xoxb-test",
-            signing_secret="test-secret",
-            token_verification_enabled=False,
-        )
-        register_commands(app)
-
-        # Get the registered command handler
-        handler = None
-        for listener in app._listeners:
-            if hasattr(listener, 'ack') and '/issue' in str(listener):
-                handler = listener
-                break
-
-        # Simulate command
-        ack = MagicMock()
-        client = MagicMock()
-        logger = MagicMock()
-        command = {
-            "text": "",
-            "trigger_id": "test-trigger-id",
-            "channel_id": "C123",
-            "user_id": "U123",
-        }
-
-        # Find and call the handler function
-        for middleware in app._middleware_list:
-            pass
-
-        # Direct function test
-        from gitlab_integrations.slack.commands import register_commands
-        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
 
         # Create a mock app and test
         mock_app = MagicMock()
@@ -78,78 +44,89 @@ class TestIssueCommand:
 class TestIssueCreateModal:
     """Tests for issue creation modal."""
 
-    def test_modal_structure(self):
-        """Test that modal has correct structure."""
-        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
+    def test_modal_structure_with_labels(self):
+        """Test that modal has correct structure when labels are provided."""
+        from gitlab_integrations.slack.modals import build_issue_create_modal
 
-        assert ISSUE_CREATE_MODAL["type"] == "modal"
-        assert ISSUE_CREATE_MODAL["callback_id"] == "issue_create_modal"
-        assert "title" in ISSUE_CREATE_MODAL
-        assert "submit" in ISSUE_CREATE_MODAL
-        assert "blocks" in ISSUE_CREATE_MODAL
+        labels = [
+            {"name": "bug", "color": "#FF0000"},
+            {"name": "feature", "color": "#00FF00"},
+        ]
+        modal = build_issue_create_modal(labels)
+
+        assert modal["type"] == "modal"
+        assert modal["callback_id"] == "issue_create_modal"
+        assert "title" in modal
+        assert "submit" in modal
+        assert "blocks" in modal
+
+    def test_modal_structure_without_labels(self):
+        """Test that modal has correct structure when no labels are provided."""
+        from gitlab_integrations.slack.modals import build_issue_create_modal
+
+        modal = build_issue_create_modal([])
+
+        assert modal["type"] == "modal"
+        assert modal["callback_id"] == "issue_create_modal"
+        # Should have title and description blocks, but no labels block
+        block_ids = [block.get("block_id") for block in modal["blocks"]]
+        assert "title_block" in block_ids
+        assert "description_block" in block_ids
+        assert "labels_block" not in block_ids
 
     def test_modal_has_required_fields(self):
         """Test that modal has all required input fields."""
-        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
+        from gitlab_integrations.slack.modals import build_issue_create_modal
 
-        blocks = ISSUE_CREATE_MODAL["blocks"]
+        labels = [{"name": "bug", "color": "#FF0000"}]
+        modal = build_issue_create_modal(labels)
+
+        blocks = modal["blocks"]
         block_ids = [block.get("block_id") for block in blocks]
 
         assert "title_block" in block_ids
-        assert "type_block" in block_ids
-        assert "priority_block" in block_ids
         assert "description_block" in block_ids
+        assert "labels_block" in block_ids
 
-    def test_modal_type_options(self):
-        """Test that modal has correct type options."""
-        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
+    def test_modal_label_options_from_gitlab(self):
+        """Test that modal has label options from GitLab."""
+        from gitlab_integrations.slack.modals import build_issue_create_modal
 
-        type_block = None
-        for block in ISSUE_CREATE_MODAL["blocks"]:
-            if block.get("block_id") == "type_block":
-                type_block = block
+        labels = [
+            {"name": "bug", "color": "#FF0000"},
+            {"name": "feature", "color": "#00FF00"},
+            {"name": "documentation", "color": "#0000FF"},
+        ]
+        modal = build_issue_create_modal(labels)
+
+        labels_block = None
+        for block in modal["blocks"]:
+            if block.get("block_id") == "labels_block":
+                labels_block = block
                 break
 
-        assert type_block is not None
-        options = type_block["element"]["options"]
+        assert labels_block is not None
+        options = labels_block["element"]["options"]
         option_values = [opt["value"] for opt in options]
 
         assert "bug" in option_values
         assert "feature" in option_values
         assert "documentation" in option_values
-        assert "question" in option_values
 
-    def test_modal_priority_options(self):
-        """Test that modal has correct priority options."""
-        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
+    def test_modal_uses_multi_select_for_labels(self):
+        """Test that modal uses multi-select for labels."""
+        from gitlab_integrations.slack.modals import build_issue_create_modal
 
-        priority_block = None
-        for block in ISSUE_CREATE_MODAL["blocks"]:
-            if block.get("block_id") == "priority_block":
-                priority_block = block
+        labels = [{"name": "bug", "color": "#FF0000"}]
+        modal = build_issue_create_modal(labels)
+
+        labels_block = None
+        for block in modal["blocks"]:
+            if block.get("block_id") == "labels_block":
+                labels_block = block
                 break
 
-        assert priority_block is not None
-        options = priority_block["element"]["options"]
-        option_values = [opt["value"] for opt in options]
-
-        assert "critical" in option_values
-        assert "high" in option_values
-        assert "medium" in option_values
-        assert "low" in option_values
-
-    def test_modal_default_priority(self):
-        """Test that modal has medium as default priority."""
-        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
-
-        priority_block = None
-        for block in ISSUE_CREATE_MODAL["blocks"]:
-            if block.get("block_id") == "priority_block":
-                priority_block = block
-                break
-
-        initial_option = priority_block["element"]["initial_option"]
-        assert initial_option["value"] == "medium"
+        assert labels_block["element"]["type"] == "multi_static_select"
 
 
 class TestIssueCreation:
@@ -159,7 +136,7 @@ class TestIssueCreation:
         """Test that issue is created with correct labels."""
         from gitlab_integrations.gitlab.api import create_issue
 
-        labels = ["type::bug", "priority::high"]
+        labels = ["bug", "feature"]
         result = create_issue(
             title="Bug Report",
             description="Test description\n\n---\n_Created from Slack by @testuser_",
@@ -179,3 +156,29 @@ class TestIssueCreation:
 
         assert result.iid == 123
         assert result.web_url == "https://gitlab.test.com/project/issues/123"
+
+
+class TestListLabels:
+    """Tests for list_labels function."""
+
+    def test_list_labels_returns_label_list(self, mock_gitlab_client, mock_gitlab_labels):
+        """Test that list_labels returns label dictionaries."""
+        from gitlab_integrations.gitlab.api import list_labels
+
+        result = list_labels()
+
+        assert len(result) == 3
+        assert result[0]["name"] == "bug"
+        assert result[0]["color"] == "#FF0000"
+        assert result[1]["name"] == "feature"
+        assert result[2]["name"] == "documentation"
+
+    def test_list_labels_empty_project(self, mock_gitlab_client, mock_gitlab_project):
+        """Test list_labels with project that has no labels."""
+        from gitlab_integrations.gitlab.api import list_labels
+
+        mock_gitlab_project.labels.list.return_value = []
+
+        result = list_labels()
+
+        assert result == []

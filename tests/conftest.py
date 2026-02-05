@@ -67,9 +67,32 @@ def mock_gitlab_issue() -> MagicMock:
 
 
 @pytest.fixture
+def mock_gitlab_labels() -> list[MagicMock]:
+    """
+    Create mocked GitLab label objects.
+
+    Returns:
+        list[MagicMock]: List of mock label objects with name and color.
+    """
+    labels: list[MagicMock] = []
+    label_data = [
+        {"name": "bug", "color": "#FF0000"},
+        {"name": "feature", "color": "#00FF00"},
+        {"name": "documentation", "color": "#0000FF"},
+    ]
+    for data in label_data:
+        label = MagicMock()
+        label.name = data["name"]
+        label.color = data["color"]
+        labels.append(label)
+    return labels
+
+
+@pytest.fixture
 def mock_gitlab_client(
     mock_gitlab_project: MagicMock,
     mock_gitlab_issue: MagicMock,
+    mock_gitlab_labels: list[MagicMock],
 ) -> Generator[MagicMock, None, None]:
     """
     Create a mocked GitLab client with project and issue operations.
@@ -80,6 +103,7 @@ def mock_gitlab_client(
     Args:
         mock_gitlab_project: Mocked project fixture.
         mock_gitlab_issue: Mocked issue fixture.
+        mock_gitlab_labels: Mocked labels fixture.
 
     Yields:
         MagicMock: Patched GitLab client with configured return values.
@@ -89,6 +113,7 @@ def mock_gitlab_client(
         mock_gitlab_project.issues.create.return_value = mock_gitlab_issue
         mock_gitlab_project.issues.get.return_value = mock_gitlab_issue
         mock_gitlab_project.issues.list.return_value = [mock_gitlab_issue]
+        mock_gitlab_project.labels.list.return_value = mock_gitlab_labels
         yield mock_gl
 
 
