@@ -31,6 +31,12 @@ slack_handler = SlackRequestHandler(slack_app)
 async def lifespan(app: FastAPI):
     """애플리케이션 라이프사이클 관리."""
     print("🚀 GitLab-Slack Integration 서비스 시작")
+
+    # 보안 설정 확인
+    if not settings.gitlab_webhook_secret:
+        print("⚠️  경고: GITLAB_WEBHOOK_SECRET이 설정되지 않았습니다!")
+        print("   프로덕션 환경에서는 반드시 Webhook Secret을 설정하세요.")
+
     yield
     print("👋 서비스 종료")
 

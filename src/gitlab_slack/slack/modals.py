@@ -190,5 +190,5 @@ def register_modals(app: App):
             logger.error(f"이슈 생성 실패: {e}")
             client.chat_postMessage(
                 channel=settings.slack_channel_id,
-                text=f"❌ 이슈 생성에 실패했습니다: {e}",
+                text="❌ 이슈 생성에 실패했습니다. 관리자에게 문의하세요.",
             )

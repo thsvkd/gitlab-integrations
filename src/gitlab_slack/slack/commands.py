@@ -53,7 +53,7 @@ def register_commands(app: App):
                     client.chat_postEphemeral(
                         channel=channel_id,
                         user=user_id,
-                        text=f"❌ 이슈 조회 중 오류가 발생했습니다: {e}",
+                        text="❌ 이슈 조회 중 오류가 발생했습니다. 관리자에게 문의하세요.",
                     )
             else:
                 client.chat_postEphemeral(
@@ -71,5 +71,5 @@ def register_commands(app: App):
             client.chat_postEphemeral(
                 channel=channel_id,
                 user=user_id,
-                text=f"❌ 이슈 생성 모달을 열 수 없습니다: {e}",
+                text="❌ 이슈 생성 모달을 열 수 없습니다. 관리자에게 문의하세요.",
             )

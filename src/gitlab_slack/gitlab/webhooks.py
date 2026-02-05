@@ -1,14 +1,25 @@
 """GitLab Webhook 처리."""
 
+import logging
+
 from fastapi import APIRouter, Header, HTTPException, Request
 from slack_sdk import WebClient
 
 from gitlab_slack.config import settings
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 # Slack 클라이언트
 slack_client = WebClient(token=settings.slack_bot_token)
+
+# Webhook Secret 미설정 경고
+if not settings.gitlab_webhook_secret:
+    logger.warning(
+        "⚠️  GITLAB_WEBHOOK_SECRET이 설정되지 않았습니다. "
+        "프로덕션 환경에서는 반드시 설정하세요!"
+    )
 
 
 @router.post("/webhook")
