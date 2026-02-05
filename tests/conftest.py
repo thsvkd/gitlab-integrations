@@ -28,6 +28,9 @@ os.environ.setdefault("GITLAB_WEBHOOK_SECRET", "test-webhook-secret")
 os.environ.setdefault("SLACK_BOT_TOKEN", "xoxb-test-token")
 os.environ.setdefault("SLACK_SIGNING_SECRET", "test-signing-secret")
 os.environ.setdefault("SLACK_CHANNEL_ID", "C0123456789")
+os.environ.setdefault("NOTION_TOKEN", "test-notion-token")
+os.environ.setdefault("NOTION_DATABASE_ID", "test-database-id")
+os.environ.setdefault("NOTION_SYNC_ENABLED", "false")
 
 
 @pytest.fixture

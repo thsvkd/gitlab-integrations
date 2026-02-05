@@ -13,8 +13,10 @@ Integration service for **self-hosted (on-premise) GitLab** with external servic
 - **GitLab → Slack**: Notifications for issue status changes
 - **Status Check**: Check issue status with `/issue status #123`
 
-### Coming Soon
-- Notion integration
+### Notion Integration
+- **GitLab → Notion**: Auto-sync issues to Notion database (real-time via webhook)
+- **Notion → GitLab**: Sync changes back to GitLab (polling-based)
+- **Conflict Resolution**: Last Write Wins (LWW) strategy
 
 ## Architecture
 
@@ -33,7 +35,10 @@ Integration service for **self-hosted (on-premise) GitLab** with external servic
     │  │  Integration    │◄─┼───────────────────┼─────────┘         │
     │  │  Server         │──┼───────────────────┼──────────────────►│
     │  │  (FastAPI)      │  │  (Cloudflare,     │                   │
-    │  └─────────────────┘  │   Tailscale, etc) │                   │
+    │  └────────┬────────┘  │   Tailscale, etc) │  ┌─────────────┐  │
+    │           │           │                   │  │   Notion    │  │
+    │           └───────────┼───────────────────┼─►│  Database   │  │
+    │              Polling  │                   │  └─────────────┘  │
     │                       │                   │                   │
     └───────────────────────┘                   └───────────────────┘
 ```
@@ -194,7 +199,86 @@ vi .env
 
 ---
 
-## 4. Environment Variables
+## 4. Notion Configuration (Optional)
+
+> **Note**: Notion integration is optional. Skip this section if you only need Slack integration.
+
+### Step 1: Create Notion Integration
+
+1. Go to [Notion Integrations](https://www.notion.so/my-integrations)
+2. Click **+ New integration**
+3. Enter the following:
+
+| Field | Value |
+|-------|-------|
+| Name | `GitLab Issue Sync` |
+| Associated workspace | Select your workspace |
+| Type | Internal |
+
+4. Click **Submit**
+5. Copy the **Internal Integration Secret** (starts with `secret_`)
+
+### Step 2: Create Notion Database
+
+Create a new database in Notion with the following properties:
+
+| Property Name | Type | Description |
+|---------------|------|-------------|
+| Title | Title | Issue title (default property) |
+| Status | Select | Options: `opened`, `closed` |
+| Labels | Multi-select | GitLab labels |
+| GitLab IID | Number | Issue number in GitLab |
+| GitLab URL | URL | Link to GitLab issue |
+| Author | Text | Issue author name |
+| Description | Text | Issue description |
+| Created At | Date | Issue creation date |
+| Updated At | Date | Last update date |
+| Last Synced | Date | Last sync timestamp |
+
+> ⚠️ **Important**: Property names must match **exactly** as shown above (case-sensitive).
+
+**Quick Setup:**
+1. Create a new page in Notion
+2. Type `/database` and select **Database - Full page**
+3. Add each property with the exact names and types listed above
+4. For **Status** property, add two options: `opened` and `closed`
+
+### Step 3: Connect Integration to Database
+
+> ⚠️ **Important**: You must connect the Integration to the **database itself**, not just the page containing it.
+
+**For Full-page Database:**
+1. Open the database as a full page (click ↗️ or "Open as full page")
+2. Click **...** (menu) in the top-right corner
+3. Click **+ Add connections**
+4. Search for and select your integration (`GitLab Issue Sync`)
+5. Click **Confirm**
+
+**For Inline Database:**
+1. Open the page that contains the database
+2. Click **...** (menu) in the top-right corner of the **page**
+3. Click **+ Add connections**
+4. Select your integration - it will apply to all databases in that page
+
+> **Tip**: If the integration doesn't appear in the connection list, try refreshing the page or check that the integration is set to "Internal" type.
+
+### Step 4: Get Database ID
+
+1. Open your Notion database in a browser
+2. The URL looks like: `https://www.notion.so/workspace/DATABASE_ID?v=...`
+3. Copy the **DATABASE_ID** part (32-character string)
+
+Example:
+```
+URL: https://www.notion.so/myworkspace/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6?v=...
+Database ID: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+```
+
+> **Tip**: The database ID can also be found in "Copy link" - it's the part before the `?v=` parameter.
+
+---
+
+## 5. Environment Variables
 
 Open `.env` file and enter the following values:
 
@@ -210,14 +294,31 @@ SLACK_BOT_TOKEN=xoxb-xxxx-xxxx-xxxx           # Bot User OAuth Token
 SLACK_SIGNING_SECRET=xxxxxxxxxxxxxxxxxxxxxxx   # Signing Secret
 SLACK_CHANNEL_ID=C0123456789                   # Notification channel ID
 
+# Notion settings (optional)
+NOTION_TOKEN=secret_xxxxxxxxxxxxxxxxxxxx       # Integration Secret
+NOTION_DATABASE_ID=a1b2c3d4e5f6...             # Database ID (32 characters)
+NOTION_SYNC_ENABLED=true                       # Enable sync (true/false)
+NOTION_SYNC_INTERVAL=60                        # Polling interval in seconds
+
 # Server settings
 HOST=0.0.0.0
 PORT=8000
 ```
 
+### Notion Settings Explained
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `NOTION_TOKEN` | Yes* | - | Integration secret from Step 1 |
+| `NOTION_DATABASE_ID` | Yes* | - | Database ID from Step 4 |
+| `NOTION_SYNC_ENABLED` | No | `false` | Set to `true` to enable sync |
+| `NOTION_SYNC_INTERVAL` | No | `60` | How often to poll Notion (seconds) |
+
+> *Required only if `NOTION_SYNC_ENABLED=true`
+
 ---
 
-## 5. Running
+## 6. Running
 
 ### Run with Script (Recommended)
 
@@ -250,7 +351,7 @@ docker-compose logs -f
 
 ---
 
-## 6. Usage
+## 7. Usage
 
 ### Create Issue
 
@@ -274,9 +375,28 @@ Type `/issue` in Slack → Enter information in modal popup → Click Create
 /issue status #123
 ```
 
+### Notion Sync (if enabled)
+
+**GitLab → Notion (Automatic)**
+- When issues are created/updated/closed in GitLab, they automatically sync to Notion
+- Triggered by GitLab webhooks (real-time)
+
+**Notion → GitLab (Polling)**
+- Changes made in Notion are synced back to GitLab
+- Runs every 60 seconds (configurable via `NOTION_SYNC_INTERVAL`)
+- Editable fields in Notion:
+  - **Title** → Updates GitLab issue title
+  - **Status** → `closed` closes the issue, `opened` reopens it
+  - **Labels** → Updates GitLab labels
+  - **Description** → Updates GitLab description
+
+**Conflict Resolution**
+- If both GitLab and Notion are modified since last sync, **Last Write Wins** (LWW)
+- The more recently modified side takes precedence
+
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 ### Slack `/issue` Command Errors
 
@@ -407,7 +527,38 @@ Summary of easily confused URL settings:
 
 ---
 
-## 8. Development
+### Notion Sync Errors
+
+#### "Notion token is not configured"
+
+**Cause**: `NOTION_TOKEN` not set while sync is enabled
+
+**Solution**: Add valid `NOTION_TOKEN` to `.env` or set `NOTION_SYNC_ENABLED=false`
+
+#### "Notion database ID is not configured"
+
+**Cause**: `NOTION_DATABASE_ID` not set while sync is enabled
+
+**Solution**: Add valid `NOTION_DATABASE_ID` to `.env`
+
+#### Issues not syncing to Notion
+
+**Check**:
+1. Verify `NOTION_SYNC_ENABLED=true` in `.env`
+2. Verify the Integration is connected to the database (Step 3 in Notion Configuration)
+3. Check server logs for API errors
+4. Verify database property names match exactly (case-sensitive)
+
+#### Notion changes not syncing to GitLab
+
+**Check**:
+1. Wait for the polling interval (default 60 seconds)
+2. Verify the page has a valid `GitLab IID` property
+3. Check server logs for sync errors
+
+---
+
+## 9. Development
 
 ### Run Tests
 

@@ -13,8 +13,10 @@
 - **GitLab → Slack**: 이슈 상태 변경 알림
 - **상태 조회**: `/issue status #123`으로 이슈 상태 확인
 
-### 추후 추가 예정
-- Notion 연동
+### Notion 연동
+- **GitLab → Notion**: 이슈를 Notion 데이터베이스에 자동 동기화 (웹훅을 통한 실시간)
+- **Notion → GitLab**: Notion 변경사항을 GitLab으로 동기화 (폴링 방식)
+- **충돌 해결**: Last Write Wins (LWW) - 최신 수정 우선
 
 ## 아키텍처
 
@@ -33,7 +35,10 @@
     │  │  Integration    │◄─┼───────────────────┼─────────┘         │
     │  │  Server         │──┼───────────────────┼──────────────────►│
     │  │  (FastAPI)      │  │  (Cloudflare,     │                   │
-    │  └─────────────────┘  │   Tailscale 등)   │                   │
+    │  └────────┬────────┘  │   Tailscale 등)   │  ┌─────────────┐  │
+    │           │           │                   │  │   Notion    │  │
+    │           └───────────┼───────────────────┼─►│ 데이터베이스│  │
+    │              폴링     │                   │  └─────────────┘  │
     │                       │                   │                   │
     └───────────────────────┘                   └───────────────────┘
 ```
@@ -194,7 +199,86 @@ vi .env
 
 ---
 
-## 4. 환경변수 설정
+## 4. Notion 설정 (선택사항)
+
+> **참고**: Notion 연동은 선택사항입니다. Slack 연동만 필요하면 이 섹션을 건너뛰세요.
+
+### Step 1: Notion Integration 생성
+
+1. [Notion Integrations](https://www.notion.so/my-integrations) 접속
+2. **+ New integration** 클릭
+3. 다음 정보 입력:
+
+| 필드 | 값 |
+|------|------|
+| Name | `GitLab Issue Sync` |
+| Associated workspace | 워크스페이스 선택 |
+| Type | Internal |
+
+4. **Submit** 클릭
+5. **Internal Integration Secret** 복사 (`secret_`로 시작)
+
+### Step 2: Notion 데이터베이스 생성
+
+다음 속성을 가진 새 데이터베이스를 Notion에 생성합니다:
+
+| 속성 이름 | 타입 | 설명 |
+|-----------|------|------|
+| Title | Title | 이슈 제목 (기본 속성) |
+| Status | Select | 옵션: `opened`, `closed` |
+| Labels | Multi-select | GitLab 라벨 |
+| GitLab IID | Number | GitLab 이슈 번호 |
+| GitLab URL | URL | GitLab 이슈 링크 |
+| Author | Text | 이슈 작성자 |
+| Description | Text | 이슈 설명 |
+| Created At | Date | 이슈 생성일 |
+| Updated At | Date | 마지막 수정일 |
+| Last Synced | Date | 마지막 동기화 시간 |
+
+> ⚠️ **중요**: 속성 이름은 위에 표시된 대로 **정확히** 일치해야 합니다 (대소문자 구분).
+
+**빠른 설정:**
+1. Notion에서 새 페이지 생성
+2. `/database` 입력 후 **Database - Full page** 선택
+3. 위 목록의 정확한 이름과 타입으로 각 속성 추가
+4. **Status** 속성에 두 옵션 추가: `opened`, `closed`
+
+### Step 3: Integration과 데이터베이스 연결
+
+> ⚠️ **중요**: 데이터베이스가 있는 페이지가 아니라 **데이터베이스 자체**에 Integration을 연결해야 합니다.
+
+**Full-page Database (전체 페이지 데이터베이스):**
+1. 데이터베이스를 전체 페이지로 열기 (↗️ 클릭 또는 "Open as full page")
+2. 우측 상단 **...** (메뉴) 클릭
+3. **+ Add connections** 클릭
+4. Integration 검색 및 선택 (`GitLab Issue Sync`)
+5. **Confirm** 클릭
+
+**Inline Database (인라인 데이터베이스):**
+1. 데이터베이스가 포함된 페이지 열기
+2. **페이지**의 우측 상단 **...** (메뉴) 클릭
+3. **+ Add connections** 클릭
+4. Integration 선택 - 해당 페이지의 모든 데이터베이스에 적용됨
+
+> **팁**: 연결 목록에 Integration이 보이지 않으면 페이지를 새로고침하거나, Integration 타입이 "Internal"로 설정되어 있는지 확인하세요.
+
+### Step 4: Database ID 확인
+
+1. 브라우저에서 Notion 데이터베이스 열기
+2. URL 형식: `https://www.notion.so/workspace/DATABASE_ID?v=...`
+3. **DATABASE_ID** 부분 복사 (32자 문자열)
+
+예시:
+```
+URL: https://www.notion.so/myworkspace/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6?v=...
+Database ID: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+```
+
+> **팁**: "Copy link"에서도 Database ID를 찾을 수 있습니다 - `?v=` 앞의 부분입니다.
+
+---
+
+## 5. 환경변수 설정
 
 `.env` 파일을 열고 다음 값들을 입력:
 
@@ -210,14 +294,31 @@ SLACK_BOT_TOKEN=xoxb-xxxx-xxxx-xxxx           # Bot User OAuth Token
 SLACK_SIGNING_SECRET=xxxxxxxxxxxxxxxxxxxxxxx   # Signing Secret
 SLACK_CHANNEL_ID=C0123456789                   # 알림 채널 ID
 
+# Notion 설정 (선택사항)
+NOTION_TOKEN=secret_xxxxxxxxxxxxxxxxxxxx       # Integration Secret
+NOTION_DATABASE_ID=a1b2c3d4e5f6...             # Database ID (32자)
+NOTION_SYNC_ENABLED=true                       # 동기화 활성화 (true/false)
+NOTION_SYNC_INTERVAL=60                        # 폴링 간격 (초)
+
 # 서버 설정
 HOST=0.0.0.0
 PORT=8000
 ```
 
+### Notion 설정 설명
+
+| 변수 | 필수 | 기본값 | 설명 |
+|------|------|--------|------|
+| `NOTION_TOKEN` | 예* | - | Step 1에서 얻은 Integration secret |
+| `NOTION_DATABASE_ID` | 예* | - | Step 4에서 얻은 Database ID |
+| `NOTION_SYNC_ENABLED` | 아니오 | `false` | `true`로 설정하면 동기화 활성화 |
+| `NOTION_SYNC_INTERVAL` | 아니오 | `60` | Notion 폴링 간격 (초) |
+
+> *`NOTION_SYNC_ENABLED=true`인 경우에만 필수
+
 ---
 
-## 5. 실행
+## 6. 실행
 
 ### 스크립트로 실행 (권장)
 
@@ -250,7 +351,7 @@ docker-compose logs -f
 
 ---
 
-## 6. 사용법
+## 7. 사용법
 
 ### 이슈 생성
 
@@ -274,9 +375,28 @@ Slack에서 `/issue` 입력 → 모달 팝업에서 정보 입력 → 생성하�
 /issue status #123
 ```
 
+### Notion 동기화 (활성화된 경우)
+
+**GitLab → Notion (자동)**
+- GitLab에서 이슈 생성/수정/닫기 시 자동으로 Notion에 동기화
+- GitLab 웹훅을 통해 실시간 동작
+
+**Notion → GitLab (폴링)**
+- Notion에서 변경한 내용이 GitLab에 동기화됨
+- 60초마다 실행 (`NOTION_SYNC_INTERVAL`로 설정 가능)
+- Notion에서 수정 가능한 필드:
+  - **Title** → GitLab 이슈 제목 업데이트
+  - **Status** → `closed`면 이슈 닫힘, `opened`면 다시 열림
+  - **Labels** → GitLab 라벨 업데이트
+  - **Description** → GitLab 설명 업데이트
+
+**충돌 해결**
+- GitLab과 Notion 모두 마지막 동기화 이후 수정된 경우, **Last Write Wins** (LWW) 적용
+- 더 최근에 수정된 쪽이 우선
+
 ---
 
-## 7. 트러블슈팅
+## 8. 트러블슈팅
 
 ### Slack `/issue` 커맨드 실행 시 에러
 
@@ -407,7 +527,38 @@ sudo apt install python3.10-venv
 
 ---
 
-## 8. 개발
+### Notion 동기화 에러
+
+#### "Notion token is not configured"
+
+**원인**: 동기화가 활성화되었지만 `NOTION_TOKEN`이 설정되지 않음
+
+**해결**: `.env`에 유효한 `NOTION_TOKEN` 추가 또는 `NOTION_SYNC_ENABLED=false` 설정
+
+#### "Notion database ID is not configured"
+
+**원인**: 동기화가 활성화되었지만 `NOTION_DATABASE_ID`가 설정되지 않음
+
+**해결**: `.env`에 유효한 `NOTION_DATABASE_ID` 추가
+
+#### 이슈가 Notion에 동기화되지 않음
+
+**확인 사항**:
+1. `.env`에 `NOTION_SYNC_ENABLED=true` 확인
+2. Integration이 데이터베이스에 연결되었는지 확인 (Notion 설정 Step 3)
+3. 서버 로그에서 API 에러 확인
+4. 데이터베이스 속성 이름이 정확히 일치하는지 확인 (대소문자 구분)
+
+#### Notion 변경사항이 GitLab에 동기화되지 않음
+
+**확인 사항**:
+1. 폴링 간격 대기 (기본 60초)
+2. 페이지에 유효한 `GitLab IID` 속성이 있는지 확인
+3. 서버 로그에서 동기화 에러 확인
+
+---
+
+## 9. 개발
 
 ### 테스트 실행
 

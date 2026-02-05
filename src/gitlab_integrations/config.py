@@ -24,6 +24,10 @@ class Settings(BaseSettings):
         slack_bot_token: Slack Bot OAuth token (xoxb-...)
         slack_signing_secret: Slack app signing secret for request verification
         slack_channel_id: Slack channel ID for posting notifications
+        notion_token: Notion integration token (optional)
+        notion_database_id: Notion database ID for issue sync (optional)
+        notion_sync_enabled: Enable Notion sync (default: False)
+        notion_sync_interval: Notion polling interval in seconds (default: 60)
         host: Server host address (default: 0.0.0.0)
         port: Server port number (default: 8000)
     """
@@ -38,6 +42,12 @@ class Settings(BaseSettings):
     slack_bot_token: str
     slack_signing_secret: str
     slack_channel_id: str
+
+    # Notion settings
+    notion_token: str | None = None
+    notion_database_id: str | None = None
+    notion_sync_enabled: bool = False
+    notion_sync_interval: int = 60
 
     # Server settings
     host: str = "0.0.0.0"
