@@ -10,7 +10,7 @@ class TestIssueCommand:
 
     def test_issue_command_opens_modal(self):
         """Test that /issue command opens the issue creation modal."""
-        from gitlab_slack.slack.commands import register_commands
+        from gitlab_integrations.slack.commands import register_commands
         from slack_bolt import App
 
         app = App(
@@ -43,8 +43,8 @@ class TestIssueCommand:
             pass
 
         # Direct function test
-        from gitlab_slack.slack.commands import register_commands
-        from gitlab_slack.slack.modals import ISSUE_CREATE_MODAL
+        from gitlab_integrations.slack.commands import register_commands
+        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
 
         # Create a mock app and test
         mock_app = MagicMock()
@@ -55,7 +55,7 @@ class TestIssueCommand:
 
     def test_issue_status_command_with_valid_issue(self, mock_gitlab_client, mock_gitlab_issue):
         """Test /issue status command with valid issue number."""
-        from gitlab_slack.gitlab.api import get_issue_by_iid
+        from gitlab_integrations.gitlab.api import get_issue_by_iid
 
         # The issue should be found
         result = get_issue_by_iid(123)
@@ -65,7 +65,7 @@ class TestIssueCommand:
     def test_issue_status_command_with_invalid_issue(self, mock_gitlab_client, mock_gitlab_project):
         """Test /issue status command with invalid issue number."""
         import gitlab
-        from gitlab_slack.gitlab.api import get_issue_by_iid
+        from gitlab_integrations.gitlab.api import get_issue_by_iid
 
         mock_gitlab_project.issues.get.side_effect = gitlab.exceptions.GitlabGetError(
             response_code=404, error_message="Not found"
@@ -80,7 +80,7 @@ class TestIssueCreateModal:
 
     def test_modal_structure(self):
         """Test that modal has correct structure."""
-        from gitlab_slack.slack.modals import ISSUE_CREATE_MODAL
+        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
 
         assert ISSUE_CREATE_MODAL["type"] == "modal"
         assert ISSUE_CREATE_MODAL["callback_id"] == "issue_create_modal"
@@ -90,7 +90,7 @@ class TestIssueCreateModal:
 
     def test_modal_has_required_fields(self):
         """Test that modal has all required input fields."""
-        from gitlab_slack.slack.modals import ISSUE_CREATE_MODAL
+        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
 
         blocks = ISSUE_CREATE_MODAL["blocks"]
         block_ids = [block.get("block_id") for block in blocks]
@@ -102,7 +102,7 @@ class TestIssueCreateModal:
 
     def test_modal_type_options(self):
         """Test that modal has correct type options."""
-        from gitlab_slack.slack.modals import ISSUE_CREATE_MODAL
+        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
 
         type_block = None
         for block in ISSUE_CREATE_MODAL["blocks"]:
@@ -121,7 +121,7 @@ class TestIssueCreateModal:
 
     def test_modal_priority_options(self):
         """Test that modal has correct priority options."""
-        from gitlab_slack.slack.modals import ISSUE_CREATE_MODAL
+        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
 
         priority_block = None
         for block in ISSUE_CREATE_MODAL["blocks"]:
@@ -140,7 +140,7 @@ class TestIssueCreateModal:
 
     def test_modal_default_priority(self):
         """Test that modal has medium as default priority."""
-        from gitlab_slack.slack.modals import ISSUE_CREATE_MODAL
+        from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
 
         priority_block = None
         for block in ISSUE_CREATE_MODAL["blocks"]:
@@ -157,7 +157,7 @@ class TestIssueCreation:
 
     def test_create_issue_with_labels(self, mock_gitlab_client, mock_gitlab_project, mock_gitlab_issue):
         """Test that issue is created with correct labels."""
-        from gitlab_slack.gitlab.api import create_issue
+        from gitlab_integrations.gitlab.api import create_issue
 
         labels = ["type::bug", "priority::high"]
         result = create_issue(
@@ -173,7 +173,7 @@ class TestIssueCreation:
 
     def test_create_issue_success_returns_issue(self, mock_gitlab_client, mock_gitlab_issue):
         """Test that successful creation returns issue object."""
-        from gitlab_slack.gitlab.api import create_issue
+        from gitlab_integrations.gitlab.api import create_issue
 
         result = create_issue(title="Test", description="Test")
 

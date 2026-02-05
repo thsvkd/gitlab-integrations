@@ -1,7 +1,7 @@
 [project]
-name = "gitlab-slack-integration"
+name = "gitlab-integrations"
 version = "0.1.0"
-description = "Issue integration service between GitLab and Slack"
+description = "Integration service between GitLab and external services (Slack, Notion, etc.)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -25,14 +25,14 @@ dev = [
 ]
 
 [project.scripts]
-gitlab-slack = "gitlab_slack.main:main"
+gitlab-integrations = "gitlab_integrations.main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/gitlab_slack"]
+packages = ["src/gitlab_integrations"]
 
 [tool.ruff]
 line-length = 100

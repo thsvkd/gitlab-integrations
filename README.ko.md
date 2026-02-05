@@ -1,14 +1,18 @@
-# GitLab-Slack Integration
+# GitLab Integrations
 
 [English](README.md)
 
-GitLab과 Slack 간의 이슈 연동 서비스
+GitLab과 외부 서비스 (Slack, Notion 등) 간의 연동 서비스
 
 ## 기능
 
+### Slack 연동
 - **Slack → GitLab**: `/issue` 커맨드로 이슈 생성
 - **GitLab → Slack**: 이슈 상태 변경 알림
 - **상태 조회**: `/issue status #123`으로 이슈 상태 확인
+
+### 추후 추가 예정
+- Notion 연동
 
 ## 아키텍처
 
@@ -37,7 +41,7 @@ GitLab과 Slack 간의 이슈 연동 서비스
 ```bash
 # 저장소 클론
 git clone <repository-url>
-cd gitlab-slack-integration
+cd gitlab-integrations
 
 # 환경 설정 (가상환경 생성 + 패키지 설치 + .env 파일 생성)
 ./scripts/setup.sh
@@ -134,7 +138,7 @@ vi .env
 
 | 필드            | 값                    |
 | --------------- | --------------------- |
-| Token name      | `slack-integration`   |
+| Token name      | `gitlab-integrations` |
 | Expiration date | 적절한 만료일 선택    |
 | Scopes          | `api` (전체 API 접근) |
 
@@ -215,7 +219,7 @@ PORT=8000
 
 ```bash
 source .venv/bin/activate
-python -m gitlab_slack.main --port 9000
+python -m gitlab_integrations.main --port 9000
 ```
 
 ### Docker 실행
@@ -306,7 +310,7 @@ Slack에서 `/issue` 입력 → 모달 팝업에서 정보 입력 → 생성하�
 ```bash
 # 서버 실행
 source .venv/bin/activate
-python -m gitlab_slack.main --port 9000
+python -m gitlab_integrations.main --port 9000
 ```
 
 #### SSL certificate verify failed (self-signed certificate)
@@ -328,7 +332,7 @@ SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certifica
 
 **원인**: GitLab 서버가 self-signed 인증서 사용
 
-**해결**: `src/gitlab_slack/gitlab/api.py`에서 `ssl_verify=False` 확인
+**해결**: `src/gitlab_integrations/gitlab/api.py`에서 `ssl_verify=False` 확인
 ```python
 gl = gitlab.Gitlab(
     settings.gitlab_url,
@@ -384,7 +388,8 @@ sudo apt install python3.10-venv
 ### 테스트 실행
 
 ```bash
-pytest
+./scripts/test.sh
+./scripts/test.sh --cov  # 커버리지 포함
 ```
 
 ### 코드 포맷팅

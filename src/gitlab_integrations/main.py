@@ -12,7 +12,7 @@ Endpoints:
     POST /slack/interactions - Slack modal interactions endpoint
 
 Usage:
-    Run directly: python -m gitlab_slack.main
+    Run directly: python -m gitlab_integrations.main
     Or use the CLI: gitlab-slack --port 8000
 """
 
@@ -26,10 +26,10 @@ from fastapi import FastAPI, Request, Response
 from slack_bolt import App
 from slack_bolt.adapter.fastapi import SlackRequestHandler
 
-from gitlab_slack.config import settings
-from gitlab_slack.gitlab.webhooks import router as gitlab_router
-from gitlab_slack.slack.commands import register_commands
-from gitlab_slack.slack.modals import register_modals
+from gitlab_integrations.config import settings
+from gitlab_integrations.gitlab.webhooks import router as gitlab_router
+from gitlab_integrations.slack.commands import register_commands
+from gitlab_integrations.slack.modals import register_modals
 
 # Initialize Slack Bolt app with credentials from settings
 slack_app: App = App(
@@ -209,7 +209,7 @@ def main() -> None:
     args: argparse.Namespace = parser.parse_args()
 
     uvicorn.run(
-        "gitlab_slack.main:app",
+        "gitlab_integrations.main:app",
         host=args.host,
         port=args.port,
         reload=not args.no_reload,

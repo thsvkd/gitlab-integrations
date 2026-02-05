@@ -84,7 +84,7 @@ def mock_gitlab_client(
     Yields:
         MagicMock: Patched GitLab client with configured return values.
     """
-    with patch("gitlab_slack.gitlab.api.gl") as mock_gl:
+    with patch("gitlab_integrations.gitlab.api.gl") as mock_gl:
         mock_gl.projects.get.return_value = mock_gitlab_project
         mock_gitlab_project.issues.create.return_value = mock_gitlab_issue
         mock_gitlab_project.issues.get.return_value = mock_gitlab_issue
@@ -103,7 +103,7 @@ def mock_slack_client() -> Generator[MagicMock, None, None]:
     Yields:
         MagicMock: Patched Slack WebClient with chat_postMessage configured.
     """
-    with patch("gitlab_slack.gitlab.webhooks.slack_client") as mock_client:
+    with patch("gitlab_integrations.gitlab.webhooks.slack_client") as mock_client:
         mock_client.chat_postMessage.return_value = {"ok": True}
         yield mock_client
 

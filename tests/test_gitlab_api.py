@@ -11,7 +11,7 @@ class TestCreateIssue:
 
     def test_create_issue_success(self, mock_gitlab_client, mock_gitlab_project, mock_gitlab_issue):
         """Test successful issue creation."""
-        from gitlab_slack.gitlab.api import create_issue
+        from gitlab_integrations.gitlab.api import create_issue
 
         result = create_issue(title="Test Issue", description="Test description")
 
@@ -25,7 +25,7 @@ class TestCreateIssue:
 
     def test_create_issue_with_labels(self, mock_gitlab_client, mock_gitlab_project):
         """Test issue creation with labels."""
-        from gitlab_slack.gitlab.api import create_issue
+        from gitlab_integrations.gitlab.api import create_issue
 
         labels = ["bug", "priority::high"]
         create_issue(title="Bug Report", description="Found a bug", labels=labels)
@@ -38,7 +38,7 @@ class TestCreateIssue:
 
     def test_create_issue_empty_description(self, mock_gitlab_client, mock_gitlab_project):
         """Test issue creation with empty description."""
-        from gitlab_slack.gitlab.api import create_issue
+        from gitlab_integrations.gitlab.api import create_issue
 
         create_issue(title="Title Only")
 
@@ -54,7 +54,7 @@ class TestGetIssueByIid:
 
     def test_get_issue_found(self, mock_gitlab_client, mock_gitlab_project, mock_gitlab_issue):
         """Test successful issue retrieval."""
-        from gitlab_slack.gitlab.api import get_issue_by_iid
+        from gitlab_integrations.gitlab.api import get_issue_by_iid
 
         result = get_issue_by_iid(123)
 
@@ -64,7 +64,7 @@ class TestGetIssueByIid:
 
     def test_get_issue_not_found(self, mock_gitlab_client, mock_gitlab_project):
         """Test issue not found returns None."""
-        from gitlab_slack.gitlab.api import get_issue_by_iid
+        from gitlab_integrations.gitlab.api import get_issue_by_iid
 
         mock_gitlab_project.issues.get.side_effect = gitlab.exceptions.GitlabGetError(
             response_code=404, error_message="Not found"
@@ -80,7 +80,7 @@ class TestUpdateIssueState:
 
     def test_close_issue(self, mock_gitlab_client, mock_gitlab_project, mock_gitlab_issue):
         """Test closing an issue."""
-        from gitlab_slack.gitlab.api import update_issue_state
+        from gitlab_integrations.gitlab.api import update_issue_state
 
         result = update_issue_state(123, "close")
 
@@ -90,7 +90,7 @@ class TestUpdateIssueState:
 
     def test_reopen_issue(self, mock_gitlab_client, mock_gitlab_project, mock_gitlab_issue):
         """Test reopening an issue."""
-        from gitlab_slack.gitlab.api import update_issue_state
+        from gitlab_integrations.gitlab.api import update_issue_state
 
         result = update_issue_state(123, "reopen")
 
@@ -103,7 +103,7 @@ class TestListIssues:
 
     def test_list_opened_issues(self, mock_gitlab_client, mock_gitlab_project, mock_gitlab_issue):
         """Test listing opened issues."""
-        from gitlab_slack.gitlab.api import list_issues
+        from gitlab_integrations.gitlab.api import list_issues
 
         result = list_issues(state="opened")
 
@@ -113,7 +113,7 @@ class TestListIssues:
 
     def test_list_issues_custom_per_page(self, mock_gitlab_client, mock_gitlab_project):
         """Test listing issues with custom per_page."""
-        from gitlab_slack.gitlab.api import list_issues
+        from gitlab_integrations.gitlab.api import list_issues
 
         list_issues(state="all", per_page=50)
 

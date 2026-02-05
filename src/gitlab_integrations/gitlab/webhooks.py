@@ -18,7 +18,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from slack_sdk import WebClient
 from slack_sdk.web import SlackResponse
 
-from gitlab_slack.config import settings
+from gitlab_integrations.config import settings
 
 logger: logging.Logger = logging.getLogger(__name__)
 

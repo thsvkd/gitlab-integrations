@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import gitlab
 from gitlab.v4.objects import Project, ProjectIssue
 
-from gitlab_slack.config import settings
+from gitlab_integrations.config import settings
 
 if TYPE_CHECKING:
     from gitlab.v4.objects import ProjectIssueManager

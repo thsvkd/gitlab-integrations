@@ -13,7 +13,7 @@ class TestWebhookSecretValidation:
     async def test_missing_event_header(self):
         """Test that missing X-Gitlab-Event header returns 400."""
         from unittest.mock import MagicMock
-        from gitlab_slack.gitlab.webhooks import handle_gitlab_webhook
+        from gitlab_integrations.gitlab.webhooks import handle_gitlab_webhook
 
         request = MagicMock()
         request.json = AsyncMock(return_value={})
@@ -32,7 +32,7 @@ class TestWebhookSecretValidation:
     async def test_invalid_webhook_secret(self):
         """Test that invalid webhook secret returns 401."""
         from unittest.mock import MagicMock
-        from gitlab_slack.gitlab.webhooks import handle_gitlab_webhook
+        from gitlab_integrations.gitlab.webhooks import handle_gitlab_webhook
 
         request = MagicMock()
         request.json = AsyncMock(return_value={})
@@ -51,7 +51,7 @@ class TestWebhookSecretValidation:
     async def test_valid_webhook_secret(self, mock_slack_client, sample_issue_webhook_payload):
         """Test that valid webhook secret is accepted."""
         from unittest.mock import MagicMock
-        from gitlab_slack.gitlab.webhooks import handle_gitlab_webhook
+        from gitlab_integrations.gitlab.webhooks import handle_gitlab_webhook
 
         request = MagicMock()
         request.json = AsyncMock(return_value=sample_issue_webhook_payload)
@@ -68,8 +68,8 @@ class TestWebhookSecretValidation:
     async def test_no_secret_configured(self, sample_issue_webhook_payload):
         """Test that webhook works when no secret is configured."""
         from unittest.mock import MagicMock
-        from gitlab_slack.gitlab import webhooks
-        from gitlab_slack.config import settings
+        from gitlab_integrations.gitlab import webhooks
+        from gitlab_integrations.config import settings
 
         request = MagicMock()
         request.json = AsyncMock(return_value=sample_issue_webhook_payload)
@@ -94,7 +94,7 @@ class TestHandleIssueEvent:
     @pytest.mark.asyncio
     async def test_handle_issue_open_event(self, mock_slack_client, sample_issue_webhook_payload):
         """Test handling issue open event."""
-        from gitlab_slack.gitlab.webhooks import handle_issue_event
+        from gitlab_integrations.gitlab.webhooks import handle_issue_event
 
         await handle_issue_event(sample_issue_webhook_payload)
 
@@ -105,7 +105,7 @@ class TestHandleIssueEvent:
     @pytest.mark.asyncio
     async def test_handle_issue_close_event(self, mock_slack_client, sample_issue_close_payload):
         """Test handling issue close event."""
-        from gitlab_slack.gitlab.webhooks import handle_issue_event
+        from gitlab_integrations.gitlab.webhooks import handle_issue_event
 
         await handle_issue_event(sample_issue_close_payload)
 
@@ -116,7 +116,7 @@ class TestHandleIssueEvent:
     @pytest.mark.asyncio
     async def test_handle_issue_update_event(self, mock_slack_client, sample_issue_update_payload):
         """Test handling issue update event."""
-        from gitlab_slack.gitlab.webhooks import handle_issue_event
+        from gitlab_integrations.gitlab.webhooks import handle_issue_event
 
         await handle_issue_event(sample_issue_update_payload)
 
@@ -127,7 +127,7 @@ class TestHandleIssueEvent:
     @pytest.mark.asyncio
     async def test_handle_issue_reopen_event(self, mock_slack_client, sample_issue_webhook_payload):
         """Test handling issue reopen event."""
-        from gitlab_slack.gitlab.webhooks import handle_issue_event
+        from gitlab_integrations.gitlab.webhooks import handle_issue_event
 
         payload = sample_issue_webhook_payload.copy()
         payload["object_attributes"] = sample_issue_webhook_payload["object_attributes"].copy()
@@ -142,7 +142,7 @@ class TestHandleIssueEvent:
     @pytest.mark.asyncio
     async def test_handle_unknown_action(self, mock_slack_client, sample_issue_webhook_payload):
         """Test that unknown actions are ignored."""
-        from gitlab_slack.gitlab.webhooks import handle_issue_event
+        from gitlab_integrations.gitlab.webhooks import handle_issue_event
 
         payload = sample_issue_webhook_payload.copy()
         payload["object_attributes"] = sample_issue_webhook_payload["object_attributes"].copy()
@@ -155,7 +155,7 @@ class TestHandleIssueEvent:
     @pytest.mark.asyncio
     async def test_description_truncation(self, mock_slack_client, sample_issue_webhook_payload):
         """Test that long descriptions are truncated."""
-        from gitlab_slack.gitlab.webhooks import handle_issue_event
+        from gitlab_integrations.gitlab.webhooks import handle_issue_event
 
         payload = sample_issue_webhook_payload.copy()
         payload["object_attributes"] = sample_issue_webhook_payload["object_attributes"].copy()

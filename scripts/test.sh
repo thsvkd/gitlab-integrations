@@ -1,5 +1,5 @@
 #!/bin/bash
-# GitLab-Slack Integration test script
+# GitLab Integrations test script
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -9,7 +9,7 @@ VENV_DIR=".venv"
 
 # Check virtual environment
 if [ ! -d "$VENV_DIR" ]; then
-    echo "❌ Virtual environment not found. Please run setup.sh first."
+    echo "Virtual environment not found. Please run setup.sh first."
     echo "   ./scripts/setup.sh"
     exit 1
 fi
@@ -17,7 +17,7 @@ fi
 # Activate virtual environment
 source "$VENV_DIR/bin/activate"
 
-echo "🧪 Running GitLab-Slack Integration tests"
+echo "Running GitLab Integrations tests"
 echo "================================================"
 
 # Default options
@@ -37,11 +37,11 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --cov|--coverage)
-            COVERAGE="--cov=src/gitlab_slack --cov-report=term-missing"
+            COVERAGE="--cov=src/gitlab_integrations --cov-report=term-missing"
             shift
             ;;
         --html)
-            COVERAGE="--cov=src/gitlab_slack --cov-report=html"
+            COVERAGE="--cov=src/gitlab_integrations --cov-report=html"
             shift
             ;;
         -h|--help)
@@ -86,9 +86,9 @@ EXIT_CODE=$?
 
 echo "================================================"
 if [ $EXIT_CODE -eq 0 ]; then
-    echo "✅ All tests passed!"
+    echo "All tests passed!"
 else
-    echo "❌ Some tests failed."
+    echo "Some tests failed."
 fi
 
 exit $EXIT_CODE

@@ -15,8 +15,8 @@ from typing import Any
 from slack_bolt import Ack, App
 from slack_sdk import WebClient
 
-from gitlab_slack.config import settings
-from gitlab_slack.gitlab.api import create_issue
+from gitlab_integrations.config import settings
+from gitlab_integrations.gitlab.api import create_issue
 
 # Type alias for Slack Block Kit view/modal structure
 SlackModal = dict[str, Any]

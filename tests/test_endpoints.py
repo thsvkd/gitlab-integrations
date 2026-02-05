@@ -26,18 +26,18 @@ def client():
                 # Remove cached modules to force re-import
                 modules_to_remove = [
                     key for key in sys.modules.keys()
-                    if key.startswith("gitlab_slack")
+                    if key.startswith("gitlab_integrations")
                 ]
                 for mod in modules_to_remove:
                     sys.modules.pop(mod, None)
 
-                from gitlab_slack.main import app
+                from gitlab_integrations.main import app
                 from fastapi.testclient import TestClient
                 yield TestClient(app)
 
                 # Clean up modules after test
                 for mod in list(sys.modules.keys()):
-                    if mod.startswith("gitlab_slack"):
+                    if mod.startswith("gitlab_integrations"):
                         sys.modules.pop(mod, None)
 
 
@@ -81,7 +81,7 @@ class TestGitLabWebhookEndpoint:
 
     def test_webhook_with_valid_secret(self, client):
         """Test webhook returns 200 with valid secret."""
-        with patch("gitlab_slack.gitlab.webhooks.slack_client") as mock_client:
+        with patch("gitlab_integrations.gitlab.webhooks.slack_client") as mock_client:
             mock_client.chat_postMessage.return_value = {"ok": True}
 
             response = client.post(

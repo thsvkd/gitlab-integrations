@@ -1,14 +1,18 @@
-# GitLab-Slack Integration
+# GitLab Integrations
 
 [한국어](README.ko.md)
 
-Issue integration service between GitLab and Slack
+Integration service between GitLab and external services (Slack, Notion, etc.)
 
 ## Features
 
+### Slack Integration
 - **Slack → GitLab**: Create issues with `/issue` command
 - **GitLab → Slack**: Notifications for issue status changes
 - **Status Check**: Check issue status with `/issue status #123`
+
+### Coming Soon
+- Notion integration
 
 ## Architecture
 
@@ -37,7 +41,7 @@ Issue integration service between GitLab and Slack
 ```bash
 # Clone repository
 git clone <repository-url>
-cd gitlab-slack-integration
+cd gitlab-integrations
 
 # Setup environment (creates venv + installs packages + generates .env)
 ./scripts/setup.sh
@@ -134,7 +138,7 @@ vi .env
 
 | Field           | Value                   |
 | --------------- | ----------------------- |
-| Token name      | `slack-integration`     |
+| Token name      | `gitlab-integrations`   |
 | Expiration date | Choose appropriate date |
 | Scopes          | `api` (full API access) |
 
@@ -215,7 +219,7 @@ PORT=8000
 
 ```bash
 source .venv/bin/activate
-python -m gitlab_slack.main --port 9000
+python -m gitlab_integrations.main --port 9000
 ```
 
 ### Docker Run
@@ -306,7 +310,7 @@ Type `/issue` in Slack → Enter information in modal popup → Click Create
 ```bash
 # Run server
 source .venv/bin/activate
-python -m gitlab_slack.main --port 9000
+python -m gitlab_integrations.main --port 9000
 ```
 
 #### SSL certificate verify failed (self-signed certificate)
@@ -328,7 +332,7 @@ SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certifica
 
 **Cause**: GitLab server uses self-signed certificate
 
-**Solution**: Verify `ssl_verify=False` in `src/gitlab_slack/gitlab/api.py`
+**Solution**: Verify `ssl_verify=False` in `src/gitlab_integrations/gitlab/api.py`
 ```python
 gl = gitlab.Gitlab(
     settings.gitlab_url,
@@ -384,7 +388,8 @@ Summary of easily confused URL settings:
 ### Run Tests
 
 ```bash
-pytest
+./scripts/test.sh
+./scripts/test.sh --cov  # with coverage
 ```
 
 ### Code Formatting

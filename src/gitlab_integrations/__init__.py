@@ -1,8 +1,10 @@
 """
-GitLab-Slack Integration Service.
+GitLab Integrations Service.
 
 This package provides a FastAPI-based service for integrating
-GitLab issues with Slack, allowing:
+GitLab with external services (Slack, Notion, etc.).
+
+Current Features (Slack):
 - Creating GitLab issues from Slack using /issue command
 - Receiving notifications in Slack when GitLab issues change
 - Checking issue status from Slack using /issue status <number>

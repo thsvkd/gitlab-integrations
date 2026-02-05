@@ -15,8 +15,8 @@ from typing import Any
 from slack_bolt import Ack, App
 from slack_sdk import WebClient
 
-from gitlab_slack.gitlab.api import get_issue_by_iid
-from gitlab_slack.slack.modals import ISSUE_CREATE_MODAL
+from gitlab_integrations.gitlab.api import get_issue_by_iid
+from gitlab_integrations.slack.modals import ISSUE_CREATE_MODAL
 
 
 def register_commands(app: App) -> None:
