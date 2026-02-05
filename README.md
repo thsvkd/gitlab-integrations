@@ -1,14 +1,16 @@
 # GitLab-Slack Integration
 
-GitLab과 Slack 간의 이슈 연동 서비스
+[한국어](README.ko.md)
 
-## 기능
+Issue integration service between GitLab and Slack
 
-- **Slack → GitLab**: `/issue` 커맨드로 이슈 생성
-- **GitLab → Slack**: 이슈 상태 변경 알림
-- **상태 조회**: `/issue status #123`으로 이슈 상태 확인
+## Features
 
-## 아키텍처
+- **Slack → GitLab**: Create issues with `/issue` command
+- **GitLab → Slack**: Notifications for issue status changes
+- **Status Check**: Check issue status with `/issue status #123`
+
+## Architecture
 
 ```
 ┌─────────────┐     ┌─────────────────────┐     ┌──────────────┐
@@ -23,221 +25,221 @@ GitLab과 Slack 간의 이슈 연동 서비스
 
 ---
 
-## 1. 설치
+## 1. Installation
 
-### 요구사항
+### Requirements
 
 - Python 3.10+
-- uv (패키지 관리자)
+- uv (package manager)
 
-### 설치 방법
+### Setup
 
 ```bash
-# 저장소 클론
+# Clone repository
 git clone <repository-url>
 cd gitlab-slack-integration
 
-# 환경 설정 (가상환경 생성 + 패키지 설치 + .env 파일 생성)
+# Setup environment (creates venv + installs packages + generates .env)
 ./scripts/setup.sh
 
-# .env 파일 편집
+# Edit .env file
 vi .env
 ```
 
 ---
 
-## 2. Slack App 설정
+## 2. Slack App Configuration
 
-### Step 1: Slack App 생성
+### Step 1: Create Slack App
 
-1. [Slack API 페이지](https://api.slack.com/apps) 접속
-2. **Create New App** 클릭
-3. **From scratch** 선택
-4. App 이름 입력 (예: `GitLab Issue Bot`)
-5. 워크스페이스 선택 후 **Create App**
+1. Go to [Slack API page](https://api.slack.com/apps)
+2. Click **Create New App**
+3. Select **From scratch**
+4. Enter App name (e.g., `GitLab Issue Bot`)
+5. Select workspace and click **Create App**
 
-### Step 2: Bot Token Scopes 설정
+### Step 2: Configure Bot Token Scopes
 
-1. 좌측 메뉴에서 **OAuth & Permissions** 클릭
-2. **Scopes** 섹션에서 **Bot Token Scopes**에 다음 권한 추가:
+1. Click **OAuth & Permissions** in the left menu
+2. In **Scopes** section, add the following **Bot Token Scopes**:
 
-| Scope               | 용도                                         |
-| ------------------- | -------------------------------------------- |
-| `chat:write`        | 채널에 메시지 전송                           |
-| `chat:write.public` | 봇이 참여하지 않은 public 채널에 메시지 전송 |
-| `commands`          | Slash 커맨드 사용                            |
+| Scope               | Purpose                                    |
+| ------------------- | ------------------------------------------ |
+| `chat:write`        | Send messages to channels                  |
+| `chat:write.public` | Send messages to public channels bot isn't in |
+| `commands`          | Use Slash commands                         |
 
-### Step 3: Slash Command 등록
+### Step 3: Register Slash Command
 
-1. 좌측 메뉴에서 **Slash Commands** 클릭
-2. **Create New Command** 클릭
-3. 다음 정보 입력:
+1. Click **Slash Commands** in the left menu
+2. Click **Create New Command**
+3. Enter the following:
 
-| 필드              | 값                                     |
+| Field             | Value                                  |
 | ----------------- | -------------------------------------- |
 | Command           | `/issue`                               |
 | Request URL       | `https://<your-domain>/slack/commands` |
-| Short Description | `GitLab 이슈 생성 및 조회`             |
-| Usage Hint        | `[status #번호]`                       |
+| Short Description | `Create and view GitLab issues`        |
+| Usage Hint        | `[status #number]`                     |
 
-4. **Save** 클릭
+4. Click **Save**
 
-> ⚠️ **주의**: Request URL은 **Integration Server의 외부 접근 가능한 URL**입니다.
-> GitLab 서버 URL이 아닙니다!
+> ⚠️ **Warning**: Request URL must be the **Integration Server's externally accessible URL**.
+> NOT the GitLab server URL!
 >
-> 예시:
+> Example:
 > - ✅ `https://your-app.company.com/slack/commands`
 > - ❌ `https://gitlab.company.com/slack/commands`
 
-### Step 4: Interactivity 활성화 (필수!)
+### Step 4: Enable Interactivity (Required!)
 
-> ⚠️ **이 설정을 하지 않으면 Modal에서 "연결하는 데 문제가 발생했습니다" 에러가 발생합니다.**
+> ⚠️ **Without this setting, you'll get "There was a problem connecting" error when submitting Modal.**
 
-1. 좌측 메뉴에서 **Interactivity & Shortcuts** 클릭
-2. **Interactivity** 토글을 **On**으로 변경
-3. **Request URL** 입력: `https://<your-domain>/slack/interactions`
-4. **Save Changes** 클릭
+1. Click **Interactivity & Shortcuts** in the left menu
+2. Toggle **Interactivity** to **On**
+3. Enter **Request URL**: `https://<your-domain>/slack/interactions`
+4. Click **Save Changes**
 
-> ⚠️ **주의**: Step 3과 마찬가지로 **Integration Server의 외부 URL**을 입력합니다.
-> Shortcuts, Select Menus 설정은 필요 없습니다.
+> ⚠️ **Warning**: Same as Step 3, enter the **Integration Server's external URL**.
+> Shortcuts and Select Menus settings are not required.
 
-### Step 5: App 설치 및 토큰 획득
+### Step 5: Install App and Get Token
 
-1. 좌측 메뉴에서 **OAuth & Permissions** 클릭
-2. **Install to Workspace** 클릭
-3. 권한 요청 확인 후 **허용**
-4. 생성된 **Bot User OAuth Token** 복사 (`xoxb-`로 시작)
+1. Click **OAuth & Permissions** in the left menu
+2. Click **Install to Workspace**
+3. Confirm permissions and click **Allow**
+4. Copy the generated **Bot User OAuth Token** (starts with `xoxb-`)
 
-### Step 6: Signing Secret 획득
+### Step 6: Get Signing Secret
 
-1. 좌측 메뉴에서 **Basic Information** 클릭
-2. **App Credentials** 섹션에서 **Signing Secret** 복사
+1. Click **Basic Information** in the left menu
+2. Copy **Signing Secret** from **App Credentials** section
 
-### Step 7: 채널 ID 확인
+### Step 7: Get Channel ID
 
-1. Slack에서 알림 받을 채널 우클릭
-2. **채널 세부정보 보기** 클릭
-3. 하단의 **채널 ID** 복사 (`C`로 시작하는 문자열)
+1. Right-click the channel to receive notifications in Slack
+2. Click **View channel details**
+3. Copy **Channel ID** at the bottom (string starting with `C`)
 
 ---
 
-## 3. GitLab 설정
+## 3. GitLab Configuration
 
-### Step 1: Personal Access Token 생성
+### Step 1: Create Personal Access Token
 
-1. GitLab 접속 → 우측 상단 프로필 아이콘 → **Preferences**
-2. 좌측 메뉴에서 **Access Tokens** 클릭
-3. **Add new token** 클릭
-4. 다음 정보 입력:
+1. Go to GitLab → Profile icon (top right) → **Preferences**
+2. Click **Access Tokens** in the left menu
+3. Click **Add new token**
+4. Enter the following:
 
-| 필드            | 값                    |
-| --------------- | --------------------- |
-| Token name      | `slack-integration`   |
-| Expiration date | 적절한 만료일 선택    |
-| Scopes          | `api` (전체 API 접근) |
+| Field           | Value                   |
+| --------------- | ----------------------- |
+| Token name      | `slack-integration`     |
+| Expiration date | Choose appropriate date |
+| Scopes          | `api` (full API access) |
 
-5. **Create personal access token** 클릭
-6. 생성된 토큰 복사 (이 화면을 벗어나면 다시 볼 수 없음)
+5. Click **Create personal access token**
+6. Copy the generated token (you won't see it again after leaving this page)
 
-### Step 2: Project ID 확인
+### Step 2: Find Project ID
 
-1. 연동할 GitLab 프로젝트 페이지 접속
-2. 프로젝트 이름 아래에 **Project ID** 표시됨
-3. 또는 **Settings → General**에서 확인
+1. Go to the GitLab project page you want to integrate
+2. **Project ID** is displayed below the project name
+3. Or check in **Settings → General**
 
-### Step 3: Webhook 설정
+### Step 3: Configure Webhook
 
-1. GitLab 프로젝트 → **Settings → Webhooks**
-2. **Add new webhook** 클릭
-3. 다음 정보 입력:
+1. Go to GitLab project → **Settings → Webhooks**
+2. Click **Add new webhook**
+3. Enter the following:
 
-| 필드             | 값                                              |
+| Field            | Value                                           |
 | ---------------- | ----------------------------------------------- |
 | URL              | `https://<your-domain>/gitlab/webhook`          |
-| Secret token     | `.env`의 `GITLAB_WEBHOOK_SECRET`과 동일한 값    |
+| Secret token     | Same value as `GITLAB_WEBHOOK_SECRET` in `.env` |
 | Trigger          | ✅ Issues events                                 |
-| SSL verification | 환경에 맞게 선택                                |
+| SSL verification | Choose based on environment                     |
 
-4. **Add webhook** 클릭
+4. Click **Add webhook**
 
-> **Secret token 생성 방법**
+> **How to generate Secret token**
 > ```bash
-> # 방법 1: openssl 사용
+> # Method 1: Using openssl
 > openssl rand -hex 32
 >
-> # 방법 2: Python 사용
+> # Method 2: Using Python
 > python -c "import secrets; print(secrets.token_hex(32))"
 > ```
 
 ---
 
-## 4. 환경변수 설정
+## 4. Environment Variables
 
-`.env` 파일을 열고 다음 값들을 입력:
+Open `.env` file and enter the following values:
 
 ```bash
-# GitLab 설정
-GITLAB_URL=https://gitlab.your-company.com    # GitLab 서버 주소
+# GitLab settings
+GITLAB_URL=https://gitlab.your-company.com    # GitLab server URL
 GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx       # Personal Access Token
-GITLAB_PROJECT_ID=123                          # 프로젝트 ID
-GITLAB_WEBHOOK_SECRET=your-secret-token       # Webhook 검증용 (GitLab Webhook 설정과 동일하게)
+GITLAB_PROJECT_ID=123                          # Project ID
+GITLAB_WEBHOOK_SECRET=your-secret-token       # Webhook verification (same as GitLab Webhook setting)
 
-# Slack 설정
+# Slack settings
 SLACK_BOT_TOKEN=xoxb-xxxx-xxxx-xxxx           # Bot User OAuth Token
 SLACK_SIGNING_SECRET=xxxxxxxxxxxxxxxxxxxxxxx   # Signing Secret
-SLACK_CHANNEL_ID=C0123456789                   # 알림 채널 ID
+SLACK_CHANNEL_ID=C0123456789                   # Notification channel ID
 
-# 서버 설정
+# Server settings
 HOST=0.0.0.0
 PORT=8000
 ```
 
 ---
 
-## 5. 실행
+## 5. Running
 
-### 스크립트로 실행 (권장)
+### Run with Script (Recommended)
 
 ```bash
-# 기본 실행 (.env의 HOST, PORT 사용)
+# Default run (uses HOST, PORT from .env)
 ./scripts/run.sh
 
-# 다른 포트로 실행
+# Run on different port
 ./scripts/run.sh --port 9000
 
-# 호스트와 포트 지정
+# Specify host and port
 ./scripts/run.sh --host 0.0.0.0 --port 9000
 ```
 
-### 직접 실행
+### Direct Run
 
 ```bash
 source .venv/bin/activate
 python -m gitlab_slack.main --port 9000
 ```
 
-### Docker 실행
+### Docker Run
 
 ```bash
 docker-compose up -d
 
-# 로그 확인
+# Check logs
 docker-compose logs -f
 ```
 
 ---
 
-## 6. 사용법
+## 6. Usage
 
-### 이슈 생성
+### Create Issue
 
-Slack에서 `/issue` 입력 → 모달 팝업에서 정보 입력 → 생성하기
+Type `/issue` in Slack → Enter information in modal popup → Click Create
 
 ```
 /issue
 ```
 
-### 이슈 상태 조회
+### Check Issue Status
 
 ```
 /issue status 123
@@ -246,146 +248,146 @@ Slack에서 `/issue` 입력 → 모달 팝업에서 정보 입력 → 생성하�
 
 ---
 
-## 7. 트러블슈팅
+## 7. Troubleshooting
 
-### Slack `/issue` 커맨드 실행 시 에러
+### Slack `/issue` Command Errors
 
-#### "오류가 발생해 /issue에 실패했습니다" (dispatch_failed)
+#### "Error with /issue command" (dispatch_failed)
 
-**원인**: Slack이 Integration Server에 요청을 보내지 못함
+**Cause**: Slack cannot send request to Integration Server
 
-**확인 사항**:
-1. **Slash Commands의 Request URL** 확인
-   - Slack API Dashboard → Slash Commands → `/issue` 선택
-   - Request URL이 `https://<your-domain>/slack/commands`로 설정되어 있는지 확인
-   - ⚠️ GitLab URL이 아닌 **Integration Server URL**이어야 함
+**Check**:
+1. **Verify Slash Commands Request URL**
+   - Slack API Dashboard → Slash Commands → Select `/issue`
+   - Confirm Request URL is set to `https://<your-domain>/slack/commands`
+   - ⚠️ Must be **Integration Server URL**, not GitLab URL
 
-2. **서버 실행 여부** 확인
+2. **Check server status**
    ```bash
    curl https://<your-domain>/health
-   # {"status": "healthy"} 응답 확인
+   # Confirm {"status": "healthy"} response
    ```
 
-3. **서버 로그** 확인
-   - 요청이 오지 않으면: URL 설정 문제
-   - 401 에러: Signing Secret 불일치
-   - 502 에러: 서버 미실행
+3. **Check server logs**
+   - No requests: URL configuration issue
+   - 401 error: Signing Secret mismatch
+   - 502 error: Server not running
 
-#### "연결하는 데 문제가 발생했습니다" (Modal 제출 시)
+#### "There was a problem connecting" (When submitting Modal)
 
-**원인**: Interactivity 설정 누락
+**Cause**: Interactivity not configured
 
-**해결**:
+**Solution**:
 1. Slack API Dashboard → **Interactivity & Shortcuts**
-2. **Interactivity** 토글이 **On**인지 확인
-3. **Request URL**이 `https://<your-domain>/slack/interactions`로 설정되어 있는지 확인
-4. **Save Changes** 클릭
+2. Verify **Interactivity** toggle is **On**
+3. Verify **Request URL** is set to `https://<your-domain>/slack/interactions`
+4. Click **Save Changes**
 
 ---
 
-### GitLab Webhook 에러
+### GitLab Webhook Errors
 
-#### HTTP 422 에러
+#### HTTP 422 Error
 
-**원인**: Webhook URL이 잘못 설정됨 (GitLab 서버 자체를 가리킴)
+**Cause**: Webhook URL incorrectly configured (pointing to GitLab server itself)
 
-**확인**:
+**Check**:
 ```
 ❌ https://gitlab.company.com/gitlab/webhook  (GitLab URL)
 ✅ https://your-app.domain.com/gitlab/webhook  (Integration Server URL)
-✅ http://localhost:9000/gitlab/webhook  (같은 서버인 경우)
+✅ http://localhost:9000/gitlab/webhook  (if on same server)
 ```
 
-#### HTTP 502 에러
+#### HTTP 502 Error
 
-**원인**: Integration Server가 실행 중이 아님
+**Cause**: Integration Server is not running
 
-**해결**:
+**Solution**:
 ```bash
-# 서버 실행
+# Run server
 source .venv/bin/activate
 python -m gitlab_slack.main --port 9000
 ```
 
 #### SSL certificate verify failed (self-signed certificate)
 
-**원인**: GitLab 서버가 self-signed 인증서 사용
+**Cause**: GitLab server uses self-signed certificate
 
-**해결**: 이미 코드에서 `ssl_verify=False`로 처리됨. GitLab Webhook 설정에서도 **Enable SSL verification** 체크 해제
+**Solution**: Already handled with `ssl_verify=False` in code. Also uncheck **Enable SSL verification** in GitLab Webhook settings.
 
 ---
 
-### GitLab API 에러
+### GitLab API Errors
 
 #### "SSL: CERTIFICATE_VERIFY_FAILED"
 
-**증상**: 이슈 생성 시 SSL 에러 발생
+**Symptom**: SSL error when creating issue
 ```
 SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate'))
 ```
 
-**원인**: GitLab 서버가 self-signed 인증서 사용
+**Cause**: GitLab server uses self-signed certificate
 
-**해결**: `src/gitlab_slack/gitlab/api.py`에서 `ssl_verify=False` 확인
+**Solution**: Verify `ssl_verify=False` in `src/gitlab_slack/gitlab/api.py`
 ```python
 gl = gitlab.Gitlab(
     settings.gitlab_url,
     private_token=settings.gitlab_token,
-    ssl_verify=False,  # self-signed 인증서 허용
+    ssl_verify=False,  # Allow self-signed certificates
 )
 ```
 
-#### 기타 API 에러
+#### Other API Errors
 
-- `GITLAB_TOKEN`이 유효한지 확인
-- 토큰에 `api` scope가 있는지 확인
-- `GITLAB_URL`이 올바른지 확인 (끝에 `/` 없이)
+- Verify `GITLAB_TOKEN` is valid
+- Verify token has `api` scope
+- Verify `GITLAB_URL` is correct (no trailing `/`)
 
 ---
 
-### 설치 시 에러
+### Installation Errors
 
 #### "ensurepip is not available" (Ubuntu/Debian)
 
-**해결**:
+**Solution**:
 ```bash
 sudo apt install python3.10-venv
 ```
 
 #### "requires a different Python: 3.10 not in '>=3.11'"
 
-**원인**: Python 버전 호환성
+**Cause**: Python version compatibility
 
-**해결**: 이미 `pyproject.toml`에서 `requires-python = ">=3.10"`으로 설정됨
-
----
-
-### URL 설정 정리
-
-혼동하기 쉬운 URL 설정을 정리합니다:
-
-| 설정 위치 | URL 종류 | 예시 |
-|-----------|----------|------|
-| `.env`의 `GITLAB_URL` | GitLab 서버 주소 | `https://gitlab.company.com` |
-| GitLab Webhook URL | Integration Server 주소 | `http://localhost:9000/gitlab/webhook` |
-| Slack Slash Commands | Integration Server 주소 (외부) | `https://your-app.domain.com/slack/commands` |
-| Slack Interactivity | Integration Server 주소 (외부) | `https://your-app.domain.com/slack/interactions` |
-
-**핵심**:
-- `.env`의 `GITLAB_URL`만 GitLab 서버 주소
-- 나머지는 모두 **Integration Server 주소**
+**Solution**: Already configured as `requires-python = ">=3.10"` in `pyproject.toml`
 
 ---
 
-## 8. 개발
+### URL Configuration Summary
 
-### 테스트 실행
+Summary of easily confused URL settings:
+
+| Setting Location | URL Type | Example |
+|------------------|----------|---------|
+| `GITLAB_URL` in `.env` | GitLab server URL | `https://gitlab.company.com` |
+| GitLab Webhook URL | Integration Server URL | `http://localhost:9000/gitlab/webhook` |
+| Slack Slash Commands | Integration Server URL (external) | `https://your-app.domain.com/slack/commands` |
+| Slack Interactivity | Integration Server URL (external) | `https://your-app.domain.com/slack/interactions` |
+
+**Key Point**:
+- Only `GITLAB_URL` in `.env` is the GitLab server URL
+- Everything else is the **Integration Server URL**
+
+---
+
+## 8. Development
+
+### Run Tests
 
 ```bash
 pytest
 ```
 
-### 코드 포맷팅
+### Code Formatting
 
 ```bash
 ruff check --fix .
