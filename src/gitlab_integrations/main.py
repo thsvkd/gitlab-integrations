@@ -62,8 +62,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Startup:
         - Logs service start message
         - Warns if GITLAB_WEBHOOK_SECRET is not configured
+        - Starts Notion polling scheduler if enabled
 
     Shutdown:
+        - Stops Notion polling scheduler
         - Logs service stop message
     """
     # Startup
@@ -74,9 +76,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         print("Warning: GITLAB_WEBHOOK_SECRET is not configured!")
         print("   Please set the Webhook Secret for production environments.")
 
+    # Start Notion polling scheduler if enabled
+    if settings.notion_sync_enabled:
+        from gitlab_integrations.notion.tasks import start_polling_scheduler
+
+        if settings.notion_token and settings.notion_database_id:
+            start_polling_scheduler()
+            print(
+                f"Notion sync enabled (polling interval: {settings.notion_sync_interval}s)"
+            )
+        else:
+            print("Warning: Notion sync enabled but token/database_id not configured!")
+
     yield
 
     # Shutdown
+    if settings.notion_sync_enabled:
+        from gitlab_integrations.notion.tasks import stop_polling_scheduler
+
+        stop_polling_scheduler()
+
     print("Service stopped")
 
 

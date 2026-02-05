@@ -2,7 +2,8 @@
 GitLab Webhook handlers module.
 
 This module handles incoming webhooks from GitLab and posts
-notifications to Slack for issue-related events.
+notifications to Slack for issue-related events, and syncs
+issues to Notion if enabled.
 
 Supported Events:
     - Issue Hook: Triggered when issues are created, updated, closed, or reopened.
@@ -162,6 +163,32 @@ async def handle_issue_event(payload: GitLabWebhookPayload) -> None:
         text=f"{emoji} {action_text}: #{issue_iid} {issue_title}",
         blocks=blocks,
     )
+
+    # Sync to Notion if enabled
+    if settings.notion_sync_enabled:
+        try:
+            from gitlab_integrations.notion.sync import sync_gitlab_to_notion
+
+            # Build issue data for Notion sync
+            labels = payload.get("labels", [])
+            label_names = [label.get("title", "") for label in labels] if labels else []
+
+            issue_data = {
+                "iid": issue_iid,
+                "title": issue_title,
+                "description": issue_description,
+                "state": issue_state,
+                "url": issue_url,
+                "web_url": issue_url,
+                "labels": label_names,
+                "author": user_name,
+                "created_at": object_attributes.get("created_at"),
+                "updated_at": object_attributes.get("updated_at"),
+            }
+            sync_gitlab_to_notion(issue_data)
+            logger.info(f"Synced issue #{issue_iid} to Notion")
+        except Exception as e:
+            logger.error(f"Failed to sync issue #{issue_iid} to Notion: {e}")
 
 
 def _truncate_text(text: str, max_length: int = 200) -> str:
