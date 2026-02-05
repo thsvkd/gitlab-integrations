@@ -260,6 +260,13 @@ Type `/issue` in Slack → Enter information in modal popup → Click Create
 /issue
 ```
 
+**Modal Fields:**
+- **Title**: Issue title (required)
+- **Description**: Detailed description (optional)
+- **Labels**: Select from existing GitLab labels (optional, multi-select)
+
+> **Note**: Labels are dynamically loaded from your GitLab project. Only existing labels will appear in the dropdown.
+
 ### Check Issue Status
 
 ```
