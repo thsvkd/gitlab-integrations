@@ -1,71 +1,55 @@
 """
-Background polling tasks for Notion synchronization.
+Background tasks for GitLab-Notion synchronization.
 
-This module provides scheduled tasks for polling Notion changes
-and syncing them to GitLab using APScheduler.
+This module provides scheduled tasks for full reconciliation sync
+between GitLab and Notion using APScheduler.
 """
 
 import logging
-from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from gitlab_integrations.config import settings
-from gitlab_integrations.notion.sync import sync_modified_notion_pages
+from gitlab_integrations.notion.sync import full_reconciliation_sync
 
 logger = logging.getLogger(__name__)
 
 # Global scheduler instance
 _scheduler: BackgroundScheduler | None = None
 
-# Track last poll time
-_last_poll_time: datetime | None = None
-
-
-def poll_notion_changes() -> None:
+def run_full_sync() -> None:
     """
-    Poll Notion for changes and sync to GitLab.
+    Run full reconciliation sync between GitLab and Notion.
 
-    This function is called periodically by the scheduler to check
-    for Notion page modifications and sync them to GitLab.
+    This function is called at startup and periodically by the scheduler
+    to keep GitLab and Notion in sync.
     """
-    global _last_poll_time
-
     if not settings.notion_sync_enabled:
-        logger.debug("Notion sync is disabled, skipping poll")
+        logger.debug("Notion sync is disabled, skipping")
         return
 
-    logger.info("Polling Notion for changes...")
-
-    # Use last poll time, or look back 5 minutes on first run
-    since = None
-    if _last_poll_time:
-        since = _last_poll_time.isoformat()
-    else:
-        # First run: look back a bit to catch recent changes
-        since = (datetime.utcnow() - timedelta(minutes=5)).isoformat()
-
-    # Update last poll time before sync (in case of long sync)
-    _last_poll_time = datetime.utcnow()
+    logger.info("Running full reconciliation sync...")
 
     try:
-        stats = sync_modified_notion_pages(since=since)
+        stats = full_reconciliation_sync()
         logger.info(
-            f"Notion poll complete - "
-            f"total: {stats['total']}, synced: {stats['synced']}, "
-            f"skipped: {stats['skipped']}, failed: {stats['failed']}"
+            f"Full sync complete - "
+            f"GitLab: {stats['gitlab_total']}, Notion: {stats['notion_total']}, "
+            f"created: {stats['created_in_notion']}, updated_notion: {stats['updated_in_notion']}, "
+            f"updated_gitlab: {stats['updated_in_gitlab']}, skipped: {stats['skipped']}, "
+            f"failed: {stats['failed']}"
         )
     except Exception as e:
-        logger.error(f"Error during Notion poll: {e}")
+        logger.error(f"Error during full sync: {e}")
 
 
 def start_polling_scheduler() -> BackgroundScheduler | None:
     """
-    Start the Notion polling scheduler.
+    Start the Notion sync scheduler.
 
-    Creates and starts a background scheduler that polls Notion
-    at the configured interval.
+    Creates and starts a background scheduler that runs full reconciliation
+    at the configured interval. Also runs an initial sync at startup.
 
     Returns:
         BackgroundScheduler | None: Started scheduler instance,
@@ -87,20 +71,24 @@ def start_polling_scheduler() -> BackgroundScheduler | None:
         logger.warning("Scheduler is already running")
         return _scheduler
 
+    # Run initial full sync at startup
+    logger.info("Running initial full sync at startup...")
+    run_full_sync()
+
     interval_seconds = settings.notion_sync_interval
-    logger.info(f"Starting Notion polling scheduler (interval: {interval_seconds}s)")
+    logger.info(f"Starting Notion sync scheduler (interval: {interval_seconds}s)")
 
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(
-        poll_notion_changes,
+        run_full_sync,
         trigger=IntervalTrigger(seconds=interval_seconds),
-        id="notion_poll",
-        name="Poll Notion for changes",
+        id="notion_full_sync",
+        name="Full reconciliation sync",
         replace_existing=True,
     )
     _scheduler.start()
 
-    logger.info("Notion polling scheduler started")
+    logger.info("Notion sync scheduler started")
     return _scheduler
 
 

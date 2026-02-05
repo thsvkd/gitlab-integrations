@@ -28,6 +28,7 @@ from slack_bolt.adapter.fastapi import SlackRequestHandler
 
 from gitlab_integrations.config import settings
 from gitlab_integrations.gitlab.webhooks import router as gitlab_router
+from gitlab_integrations.notion.webhooks import router as notion_router
 from gitlab_integrations.slack.commands import register_commands
 from gitlab_integrations.slack.modals import register_modals
 
@@ -109,6 +110,9 @@ app: FastAPI = FastAPI(
 
 # Register GitLab webhook router
 app.include_router(gitlab_router, prefix="/gitlab", tags=["gitlab"])
+
+# Register Notion webhook router
+app.include_router(notion_router, prefix="/notion", tags=["notion"])
 
 
 @app.post("/slack/events")

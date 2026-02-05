@@ -16,6 +16,7 @@ from gitlab_integrations.notion.schemas import (
     NotionProperties,
     extract_gitlab_iid_from_page,
     extract_last_synced_from_page,
+    extract_title_from_page,
     extract_updated_at_from_page,
     gitlab_issue_to_notion_properties,
     notion_page_to_gitlab_update,
@@ -297,3 +298,261 @@ def sync_modified_notion_pages(
 
     logger.info(f"Notion sync complete: {stats}")
     return stats
+
+
+def full_reconciliation_sync(
+    client: NotionClient | None = None,
+) -> dict[str, Any]:
+    """
+    Perform full reconciliation sync between GitLab and Notion.
+
+    This function:
+    1. Fetches all GitLab issues
+    2. Fetches all Notion pages
+    3. Matches by GitLab IID
+    4. Compares timestamps and syncs using LWW (Last Write Wins)
+    5. Creates Notion pages for GitLab issues that don't exist in Notion
+
+    Args:
+        client: Optional NotionClient instance. Uses global client if None.
+
+    Returns:
+        dict[str, Any]: Sync statistics with keys:
+            - gitlab_total: Total GitLab issues
+            - notion_total: Total Notion pages
+            - created_in_notion: Pages created in Notion
+            - updated_in_notion: Pages updated in Notion
+            - updated_in_gitlab: Issues updated in GitLab
+            - skipped: Items skipped (no changes needed)
+            - failed: Failed sync operations
+    """
+    if not settings.notion_sync_enabled:
+        logger.info("Notion sync is disabled")
+        return {
+            "gitlab_total": 0,
+            "notion_total": 0,
+            "created_in_notion": 0,
+            "updated_in_notion": 0,
+            "updated_in_gitlab": 0,
+            "skipped": 0,
+            "failed": 0,
+        }
+
+    client = client or get_notion_client()
+    stats = {
+        "gitlab_total": 0,
+        "notion_total": 0,
+        "created_in_notion": 0,
+        "updated_in_notion": 0,
+        "updated_in_gitlab": 0,
+        "skipped": 0,
+        "failed": 0,
+    }
+
+    logger.info("Starting full reconciliation sync...")
+
+    try:
+        # 1. Fetch all GitLab issues
+        logger.info("Fetching all GitLab issues...")
+        gitlab_issues = gitlab_api.list_all_issues(state="all")
+        stats["gitlab_total"] = len(gitlab_issues)
+        logger.info(f"Found {len(gitlab_issues)} GitLab issues")
+
+        # Build GitLab issues map by IID
+        gitlab_by_iid: dict[int, Any] = {issue.iid: issue for issue in gitlab_issues}
+
+        # 2. Fetch all Notion pages
+        logger.info("Fetching all Notion pages...")
+        notion_pages = client.query_database_all()
+        stats["notion_total"] = len(notion_pages)
+        logger.info(f"Found {len(notion_pages)} Notion pages")
+
+        # Build Notion pages map by GitLab IID
+        notion_by_iid: dict[int, dict[str, Any]] = {}
+        notion_without_iid: list[dict[str, Any]] = []
+
+        for page in notion_pages:
+            gitlab_iid = extract_gitlab_iid_from_page(page)
+            if gitlab_iid:
+                notion_by_iid[gitlab_iid] = page
+            else:
+                notion_without_iid.append(page)
+
+        # 3. Process GitLab issues
+        for iid, gitlab_issue in gitlab_by_iid.items():
+            notion_page = notion_by_iid.get(iid)
+
+            if notion_page:
+                # Both exist - compare timestamps and use LWW
+                result = _reconcile_existing(gitlab_issue, notion_page, client)
+                if result == "updated_notion":
+                    stats["updated_in_notion"] += 1
+                elif result == "updated_gitlab":
+                    stats["updated_in_gitlab"] += 1
+                elif result == "skipped":
+                    stats["skipped"] += 1
+                else:
+                    stats["failed"] += 1
+            else:
+                # GitLab only - create in Notion
+                result = _create_notion_from_gitlab(gitlab_issue, client)
+                if result:
+                    stats["created_in_notion"] += 1
+                else:
+                    stats["failed"] += 1
+
+        # 4. Skip Notion pages without GitLab IID (they need manual button click)
+        stats["skipped"] += len(notion_without_iid)
+        if notion_without_iid:
+            logger.info(
+                f"Skipped {len(notion_without_iid)} Notion pages without GitLab IID "
+                "(use 'Push to GitLab' button to sync)"
+            )
+
+    except Exception as e:
+        logger.error(f"Error during full reconciliation sync: {e}")
+
+    logger.info(f"Full reconciliation sync complete: {stats}")
+    return stats
+
+
+def _reconcile_existing(
+    gitlab_issue: Any,
+    notion_page: dict[str, Any],
+    client: NotionClient,
+) -> str:
+    """
+    Reconcile an existing GitLab issue and Notion page.
+
+    Compares timestamps and syncs in the direction of the newer change.
+
+    Args:
+        gitlab_issue: GitLab issue object.
+        notion_page: Notion page object.
+        client: NotionClient instance.
+
+    Returns:
+        str: Result status - 'updated_notion', 'updated_gitlab', 'skipped', or 'failed'.
+    """
+    gitlab_iid = gitlab_issue.iid
+
+    # Get timestamps
+    gitlab_updated_str = getattr(gitlab_issue, "updated_at", None)
+    gitlab_updated = None
+    if gitlab_updated_str:
+        gitlab_updated = datetime.fromisoformat(gitlab_updated_str.replace("Z", "+00:00"))
+
+    notion_updated = extract_updated_at_from_page(notion_page)
+    last_synced = extract_last_synced_from_page(notion_page)
+
+    # Determine sync direction using LWW
+    if gitlab_updated and notion_updated:
+        if gitlab_updated > notion_updated:
+            # GitLab is newer - update Notion
+            logger.debug(f"Issue #{gitlab_iid}: GitLab is newer, updating Notion")
+            issue_data = {
+                "iid": gitlab_issue.iid,
+                "title": gitlab_issue.title,
+                "description": gitlab_issue.description,
+                "state": gitlab_issue.state,
+                "labels": gitlab_issue.labels,
+                "web_url": gitlab_issue.web_url,
+                "updated_at": gitlab_issue.updated_at,
+                "author": getattr(gitlab_issue, "author", None),
+                "created_at": getattr(gitlab_issue, "created_at", None),
+            }
+            try:
+                sync_gitlab_to_notion(issue_data, client)
+                return "updated_notion"
+            except Exception as e:
+                logger.error(f"Failed to update Notion for issue #{gitlab_iid}: {e}")
+                return "failed"
+        elif notion_updated > gitlab_updated:
+            # Notion is newer - check if it was modified after last sync
+            if last_synced and notion_updated > last_synced:
+                logger.debug(f"Issue #{gitlab_iid}: Notion is newer, updating GitLab")
+                try:
+                    if sync_notion_to_gitlab(notion_page, client):
+                        return "updated_gitlab"
+                    return "failed"
+                except Exception as e:
+                    logger.error(f"Failed to update GitLab for issue #{gitlab_iid}: {e}")
+                    return "failed"
+            else:
+                logger.debug(f"Issue #{gitlab_iid}: Notion newer but not modified since sync, skipping")
+                return "skipped"
+        else:
+            # Same timestamp - skip
+            logger.debug(f"Issue #{gitlab_iid}: Same timestamp, skipping")
+            return "skipped"
+    elif gitlab_updated:
+        # Only GitLab has timestamp - update Notion
+        logger.debug(f"Issue #{gitlab_iid}: Only GitLab has timestamp, updating Notion")
+        issue_data = {
+            "iid": gitlab_issue.iid,
+            "title": gitlab_issue.title,
+            "description": gitlab_issue.description,
+            "state": gitlab_issue.state,
+            "labels": gitlab_issue.labels,
+            "web_url": gitlab_issue.web_url,
+            "updated_at": gitlab_issue.updated_at,
+            "author": getattr(gitlab_issue, "author", None),
+            "created_at": getattr(gitlab_issue, "created_at", None),
+        }
+        try:
+            sync_gitlab_to_notion(issue_data, client)
+            return "updated_notion"
+        except Exception as e:
+            logger.error(f"Failed to update Notion for issue #{gitlab_iid}: {e}")
+            return "failed"
+    else:
+        # No timestamps available - skip
+        logger.debug(f"Issue #{gitlab_iid}: No timestamps available, skipping")
+        return "skipped"
+
+
+def _create_notion_from_gitlab(
+    gitlab_issue: Any,
+    client: NotionClient,
+) -> bool:
+    """
+    Create a Notion page from a GitLab issue.
+
+    Args:
+        gitlab_issue: GitLab issue object.
+        client: NotionClient instance.
+
+    Returns:
+        bool: True if creation was successful, False otherwise.
+    """
+    gitlab_iid = gitlab_issue.iid
+    logger.info(f"Creating Notion page for GitLab issue #{gitlab_iid}")
+
+    issue_data = {
+        "iid": gitlab_issue.iid,
+        "title": gitlab_issue.title,
+        "description": gitlab_issue.description,
+        "state": gitlab_issue.state,
+        "labels": gitlab_issue.labels,
+        "web_url": gitlab_issue.web_url,
+        "updated_at": getattr(gitlab_issue, "updated_at", None),
+        "author": getattr(gitlab_issue, "author", None),
+        "created_at": getattr(gitlab_issue, "created_at", None),
+    }
+
+    try:
+        result = sync_gitlab_to_notion(issue_data, client)
+        if result:
+            # Update sync status
+            page_id = result.get("id")
+            if page_id:
+                client.update_sync_status(
+                    page_id=page_id,
+                    synced=True,
+                    sync_error=None,
+                )
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Failed to create Notion page for issue #{gitlab_iid}: {e}")
+        return False

@@ -278,6 +278,119 @@ class NotionClient:
         """
         return self.query_modified_pages(since=None, page_size=page_size)
 
+    def query_database_all(self, page_size: int = 100) -> list[dict[str, Any]]:
+        """
+        Query all pages in the database (no filter).
+
+        Args:
+            page_size: Number of pages to retrieve per request.
+
+        Returns:
+            list[dict[str, Any]]: List of all page objects.
+        """
+        logger.debug("Querying all pages from database")
+
+        all_pages: list[dict[str, Any]] = []
+        has_more = True
+        start_cursor: str | None = None
+
+        while has_more:
+            response = self._query_database(
+                filter_conditions=None,
+                page_size=page_size,
+                start_cursor=start_cursor,
+            )
+            all_pages.extend(response.get("results", []))
+            has_more = response.get("has_more", False)
+            start_cursor = response.get("next_cursor")
+
+        logger.debug(f"Found {len(all_pages)} total pages")
+        return all_pages
+
+    def query_unsynced_pages(self, page_size: int = 100) -> list[dict[str, Any]]:
+        """
+        Query pages without GitLab IID (unsynced to GitLab).
+
+        Args:
+            page_size: Number of pages to retrieve per request.
+
+        Returns:
+            list[dict[str, Any]]: List of unsynced page objects.
+        """
+        logger.debug("Querying unsynced pages (no GitLab IID)")
+
+        filter_conditions: dict[str, Any] = {
+            "property": NotionProperties.GITLAB_IID,
+            "number": {"is_empty": True},
+        }
+
+        all_pages: list[dict[str, Any]] = []
+        has_more = True
+        start_cursor: str | None = None
+
+        while has_more:
+            response = self._query_database(
+                filter_conditions=filter_conditions,
+                page_size=page_size,
+                start_cursor=start_cursor,
+            )
+            all_pages.extend(response.get("results", []))
+            has_more = response.get("has_more", False)
+            start_cursor = response.get("next_cursor")
+
+        logger.debug(f"Found {len(all_pages)} unsynced pages")
+        return all_pages
+
+    def update_sync_status(
+        self,
+        page_id: str,
+        synced: bool,
+        sync_error: str | None = None,
+        gitlab_iid: int | None = None,
+        gitlab_url: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Update sync status fields on a Notion page.
+
+        Args:
+            page_id: Notion page ID to update.
+            synced: Whether sync was successful.
+            sync_error: Error message if sync failed.
+            gitlab_iid: GitLab issue IID if created.
+            gitlab_url: GitLab issue URL if created.
+
+        Returns:
+            dict[str, Any]: Updated page object.
+        """
+        from datetime import datetime, timezone
+
+        logger.info(f"Updating sync status for page {page_id}: synced={synced}")
+
+        properties: dict[str, Any] = {
+            NotionProperties.SYNCED: {"checkbox": synced},
+            NotionProperties.LAST_SYNCED: {
+                "date": {"start": datetime.now(timezone.utc).isoformat()}
+            },
+        }
+
+        # Set or clear sync error
+        if sync_error:
+            properties[NotionProperties.SYNC_ERROR] = {
+                "rich_text": [{"text": {"content": sync_error[:2000]}}]
+            }
+        else:
+            properties[NotionProperties.SYNC_ERROR] = {"rich_text": []}
+
+        # Update GitLab IID if provided
+        if gitlab_iid is not None:
+            properties[NotionProperties.GITLAB_IID] = {"number": gitlab_iid}
+
+        # Update GitLab URL if provided
+        if gitlab_url is not None:
+            properties[NotionProperties.GITLAB_URL] = {"url": gitlab_url}
+
+        return self.update_page(page_id, properties)
+
 
 # Global client instance (lazy initialization)
 _notion_client: NotionClient | None = None

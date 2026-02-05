@@ -23,6 +23,8 @@ class NotionProperties:
     CREATED_AT = "Created At"
     UPDATED_AT = "Updated At"
     LAST_SYNCED = "Last Synced"
+    SYNCED = "Synced"
+    SYNC_ERROR = "Sync Error"
 
 
 # Status mapping between GitLab and Notion
@@ -229,3 +231,88 @@ def extract_updated_at_from_page(page: dict[str, Any]) -> datetime | None:
             dt_str = dt_str + "+00:00"
         return datetime.fromisoformat(dt_str)
     return None
+
+
+def extract_title_from_page(page: dict[str, Any]) -> str | None:
+    """
+    Extract title from Notion page properties.
+
+    Args:
+        page: Notion page object.
+
+    Returns:
+        str | None: Title string if found, None otherwise.
+    """
+    properties = page.get("properties", {})
+    title_prop = properties.get(NotionProperties.TITLE, {})
+    title_arr = title_prop.get("title", [])
+    if title_arr:
+        return title_arr[0].get("text", {}).get("content", "")
+    return None
+
+
+def extract_description_from_page(page: dict[str, Any]) -> str | None:
+    """
+    Extract description from Notion page properties.
+
+    Args:
+        page: Notion page object.
+
+    Returns:
+        str | None: Description string if found, None otherwise.
+    """
+    properties = page.get("properties", {})
+    desc_prop = properties.get(NotionProperties.DESCRIPTION, {})
+    desc_arr = desc_prop.get("rich_text", [])
+    if desc_arr:
+        return desc_arr[0].get("text", {}).get("content", "")
+    return None
+
+
+def extract_labels_from_page(page: dict[str, Any]) -> list[str]:
+    """
+    Extract labels from Notion page properties.
+
+    Args:
+        page: Notion page object.
+
+    Returns:
+        list[str]: List of label names.
+    """
+    properties = page.get("properties", {})
+    labels_prop = properties.get(NotionProperties.LABELS, {})
+    labels_arr = labels_prop.get("multi_select", [])
+    return [label.get("name") for label in labels_arr if label.get("name")]
+
+
+def notion_page_to_gitlab_create(page: dict[str, Any]) -> dict[str, Any]:
+    """
+    Convert Notion page to GitLab issue creation data.
+
+    Args:
+        page: Notion page object.
+
+    Returns:
+        dict[str, Any]: GitLab issue creation data containing:
+            - title: Issue title (required)
+            - description: Issue description (optional)
+            - labels: List of label names (optional)
+    """
+    create_data: dict[str, Any] = {}
+
+    # Extract title (required)
+    title = extract_title_from_page(page)
+    if title:
+        create_data["title"] = title
+
+    # Extract description (optional)
+    description = extract_description_from_page(page)
+    if description:
+        create_data["description"] = description
+
+    # Extract labels (optional)
+    labels = extract_labels_from_page(page)
+    if labels:
+        create_data["labels"] = labels
+
+    return create_data

@@ -169,3 +169,24 @@ def list_labels() -> list[dict[str, str]]:
     project = get_project()
     labels = project.labels.list(all=True)
     return [{"name": label.name, "color": label.color} for label in labels]
+
+
+def list_all_issues(state: str = "all") -> list[ProjectIssue]:
+    """
+    List all issues from the project with pagination.
+
+    Fetches all issues matching the filter by iterating through
+    all pages of results.
+
+    Args:
+        state: Filter by issue state. Options: 'opened', 'closed', 'all'.
+
+    Returns:
+        list[ProjectIssue]: List of all issue objects matching the filter.
+
+    Example:
+        >>> all_issues = list_all_issues(state="all")
+        >>> print(f"Total issues: {len(all_issues)}")
+    """
+    project = get_project()
+    return list(project.issues.list(state=state, all=True))
